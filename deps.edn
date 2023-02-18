@@ -1,0 +1,10 @@
+{:paths ["src" "resources"]
+
+ :deps {metosin/reitit {:mvn/version "0.5.18"}
+        metosin/reitit-middleware {:mvn/version "0.5.18"}
+        hiccup/hiccup {:mvn/version "1.0.5"}
+        org.clojure/core.async {:mvn/version "1.6.673"}
+        aleph/aleph {:mvn/version "0.6.0"}}
+
+ :aliases
+ {:dev {:extra-paths ["dev"]}}}
