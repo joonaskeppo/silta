@@ -29,10 +29,17 @@
      "No clicks here"
      (format "Clicked %s times..." counter))])
 
+(defview ^:with-req test-appender
+  [{{:keys [counter]} :params}]
+  [:span (apply str (take counter (repeat ".")))])
+
 (defview ^:with-req button
   [{{:keys [counter]} :params :as p}]
   [:button {:on-click [[:swap {:target "#notice"}
-                        [notice {:counter (inc counter)}]] ;; replaces arbitrary elements with querySelectorAll
+                        [notice {:counter (inc counter)}]]  ;; replaces arbitrary elements with querySelectorAll
+                       ;; FIXME: need to have a way to deal with sequential updates
+                       [:append {:target "#notice"}
+                        [test-appender {:counter (inc counter)}]] ;; append dots
                        [:swap
                         [button {:counter (inc counter)}]]]} ;; replace this specific `button` DOM element
    (if (zero? counter)

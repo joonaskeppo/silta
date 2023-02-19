@@ -1,14 +1,3 @@
-// create HTML element, then replace via replaceSelector
-function makeElementAndReplace(htmlString, replaceSelector) {
-    // dynamic creation trickery
-    let placeholder = document.createElement('div');
-    placeholder.innerHTML = html;
-
-    // actual node
-    placeholder = placeholder.firstChild;
-    elt.replaceWith(placeholder);
-}
-
 // --- event source ---
 
 var source = new EventSource("/stream");
@@ -109,7 +98,7 @@ function setupEventHandlers(rootNodeOrSelector) {
                     const type = descriptor[0];
                     const eventConfig = descriptor[1] instanceof Array ? undefined : descriptor[1];
                     const responseHandler = {
-                        fn: responseHandlers[type],
+                        fn: handleUpdate(elementUpdates[type]),
                         // TODO: ensure that node always has id attribute! (when dynamic)
                         args: [(eventConfig && eventConfig.target) ? eventConfig.target : '#' + node.id]
                     };
@@ -155,31 +144,45 @@ function handleAjaxRequest(req, props) {
 
 // TODO: ensure that selector is always available (and unique when target is 'this')
 
-function swap(selector) {
-    return function(html) {
-        let nodes = [];
-
-        document.querySelectorAll(selector).forEach((elt) => {
-            // dynamic creation trickery
-            placeholder = document.createElement('div');
-            placeholder.innerHTML = html;
-
-            // actual node
-            placeholder = placeholder.firstChild;
-            elt.replaceWith(placeholder);
-
-            nodes.push(placeholder);
-        });
-
-        // refresh event handlers
-        console.log("Refreshing event handlers for:", nodes);
-        nodes.forEach((node) => setupEventHandlers(node));
-    }
+const elementUpdates = {
+    swap: { handler: (target, newNode) => target.replaceWith(newNode) },
+    append: { handler: (target, newNode) => target.append(newNode) },
+    prepend: { handler: (target, newNode) => target.prepend(newNode) },
+    remove: { noElementCreation: true, skipEventHandlerRefresh: true, handler:(target) => target.remove() } 
 }
 
-const responseHandlers = {
-    'swap': swap
-};
+function handleUpdate(updateConfig) {
+    return function(selector) {
+        return function(html) {
+            let nodes = [];
+
+            document.querySelectorAll(selector).forEach((elt) => {
+                let newElt;
+                if (!updateConfig.noElementCreation) {
+                    // create new temp node, will be pushed to `nodes`
+                    newElt = document.createElement('div');
+                    newElt.innerHTML = html;
+                    newElt = newElt.firstChild;
+
+                    // do update
+                    updateConfig.handler(elt, newElt);
+                } else {
+                    // no new element to create, so just call handler
+                    updateConfig.handler(elt);
+                }
+
+                // for `delete`, we don't want to refresh our event handlers
+                if (!updateConfig.skipEventHandlerRefresh) {
+                    nodes.push(newElt || elt);
+                }
+
+                // refresh event handlers
+                console.log("Refreshing event handlers for:", nodes);
+                nodes.forEach((node) => setupEventHandlers(node));
+            })
+        }
+    }
+}
 
 // Initialize with root-most node, <body>
 setupEventHandlers('body');
