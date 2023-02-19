@@ -1,7 +1,6 @@
 (ns silta.core
   (:require [hiccup.core :as h]
             [silta.hiccup]
-            [silta.dsl]
             [reitit.ring.middleware.parameters :refer [parameters-middleware]]))
 
 (defonce
@@ -30,8 +29,13 @@
 ;; TODO: should try to be half-smart about compiling as much as possible
 ;; of `body` -- what can't be inferred should be handled at runtime.
 (defmacro defview
-  "Instruments a view component.
+  "Create a view component
   Invoked similarly to `defn`.
+
+  Metadata may be provided that alters how the view is used.
+  Accepted boolean metadata:
+  * `:with-req`, provides unaltered request map to view as input
+  * `:using`, transforms the view into a sink type with a vector of (valid) sources
 
   Optional params:
   * `docstring`, as first argument
@@ -46,20 +50,20 @@
         body (drop (count-not-nils [docstring arglist props]) args)
         metadata (update (meta vname) :doc #(or % docstring))
         endpoint (make-endpoint (assoc props :name vname))
-        renderer (make-renderer vname metadata arglist body)]
+        renderer (make-renderer vname metadata arglist body)
+        context (select-keys metadata [:sink])]
     (assert (every? seq [arglist body]))
     `(do
        (def ~(with-meta vname metadata)
-         (silta.hiccup.View. ~endpoint ~(:before props) ~(:after props) ~renderer))
+         (silta.hiccup.View. ~context ~endpoint ~(:before props) ~(:after props) ~renderer))
        (swap! view-registry assoc ~endpoint ~vname)
        ~vname)))
 
 (defn- render
-  [page]
-  (->> page
-       silta.hiccup/expand-hiccup
-       silta.dsl/transform-hiccup
-       h/html))
+  ([page]
+   (render page nil))
+  ([page req] ;; TODO: is `req` actually used currently?
+   (-> page (silta.hiccup/prepare-hiccup req render) h/html)))
 
 (defn- respond-html
   [html]
@@ -74,8 +78,8 @@
     ;; TODO: float
     (let [x* (Integer/parseInt x)]
       x*)
-  (catch Exception _
-    x)))
+    (catch Exception _
+      x)))
 
 (defn- coerce-params-middleware
   [handler & _args]
@@ -103,9 +107,6 @@
                       [k (if (fn? v) v (constantly v))])
                     pages)]
     (mapv make-route (into pages views))))
-
-(comment
-  (make-routes [["/" [:div "sup"]]]))
 
 ;; TODO:
 ;; - a let-like form (e.g., `let-views`) for small, one-off views (that still require routing, obv)

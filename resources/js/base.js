@@ -1,10 +1,32 @@
+// create HTML element, then replace via replaceSelector
+function makeElementAndReplace(htmlString, replaceSelector) {
+    // dynamic creation trickery
+    let placeholder = document.createElement('div');
+    placeholder.innerHTML = html;
+
+    // actual node
+    placeholder = placeholder.firstChild;
+    elt.replaceWith(placeholder);
+}
+
 // --- event source ---
 
 var source = new EventSource("/stream");
 
 source.onmessage= (e) => {
     const data = e.data; // TODO: for now...
-    console.log(e);
+    // TODO: temp flow for demo purposes
+    if (data !== "ping") {
+        let temp = document.createElement('div');
+        temp.innerHTML = data;
+        temp = temp.firstChild;
+
+        const sinkId = temp.getAttribute('silta-sink-id');
+        console.log("Replacing sink", sinkId, data);
+
+        // handle update
+        document.querySelector(`[silta-sink-id="${sinkId}"]`).replaceWith(temp);
+    }
 
     if (data.msg == "end") {
         console.log("Closed!");
