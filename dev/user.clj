@@ -8,7 +8,9 @@
             [manifold.stream]
             [hiccup.core :refer [html]]
             [clojure.core.async :as a]
-            [clojure.java.io :as io]))
+            [clojure.java.io :as io]
+            [clojure.tools.namespace.repl :as tn]
+            [mount.core :as mount]))
 
 ;; sinks are similar to ordinary views,
 ;; except that they must be provided valid, derefable *sources* as inputs
@@ -23,45 +25,39 @@
 ;; decorate it with the `^:with-req` meta prop
 
 (defview ^:with-req notice
-  [{{:keys [counter]} :params :as p}]
+  [{[{:keys [counter]}] :params :as p}]
   [:div {:id "notice"}
    (if (zero? counter)
      "No clicks here"
      (format "Clicked %s times..." counter))])
 
 (defview ^:with-req test-appender
-  [{{:keys [counter]} :params}]
+  [{[{:keys [counter]}] :params}]
   [:span (apply str (take counter (repeat ".")))])
 
-(defview ^:with-req button
-  [{{:keys [counter]} :params :as p}]
+(defview button
+  [counter]
   [:button {:on-click [[:swap {:target "#notice"}
                         [notice {:counter (inc counter)}]]  ;; replaces arbitrary elements with querySelectorAll
                        ;; FIXME: need to have a way to deal with sequential updates
-                       [:append {:target "#notice"}
+                       #_[:append {:target "#notice"}
                         [test-appender {:counter (inc counter)}]] ;; append dots
                        [:swap
-                        [button {:counter (inc counter)}]]]} ;; replace this specific `button` DOM element
+                        [button (inc counter)]]]} ;; replace this specific `button` DOM element
    (if (zero? counter)
      "Click me"
      "Thanks, click again?")])
 
-(defonce +example-source+ (atom "hello"))
+(defonce +example-source+
+  (atom "hello"))
 
 (def page
   (let [initial-counter 0]
     [:div
      [test-sink +example-source+]
      [notice {:counter initial-counter}]
-     [button {:counter initial-counter}]
+     [button initial-counter]
      [:script (slurp (io/resource "js/base.js"))]]))
-
-(comment
-  (require '[silta.core :refer [render]])
-  (sh/prepare-hiccup page)
-
-  ;; update value, should be reflected in sink view
-  (reset! +example-source+ "UPDATED VALUE"))
 
 ;; --- routes ---
 
@@ -97,21 +93,25 @@
   (ring/ring-handler
    (ring/router routes)))
 
-(defonce server (atom nil))
+(mount/defstate server
+  :start (http/start-server main-handler {:port default-port})
+  :stop (when server (.close server)))
 
-(defn start-app
-  ([]
-   (start-app default-port))
-  ([port]
-   (let [app (http/start-server main-handler {:port port})]
-     (reset! server app))))
+(defn go []
+  (mount/start)
+  :ready)
 
-(defn stop-app []
-  (when @server
-    (.close @server)
-    (reset! server nil)))
+(defn reset []
+  (mount/stop)
+  (tn/refresh :after 'user/go))
 
 (comment
-  (start-app)
-  (stop-app))
+  (go)
+  (reset))
 
+(comment
+  (require '[silta.core :refer [render]])
+  (sh/prepare-hiccup page)
+
+  ;; update value, should be reflected in sink view
+  (reset! +example-source+ "Asdasd"))

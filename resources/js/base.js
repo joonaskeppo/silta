@@ -73,18 +73,7 @@ function makeQueryString(params) {
 }
 
 function makeRequestUrl(endpoint, params) {
-    // TODO: for non-maps, generic query params that's easy to parse on backend side?
-    // example: ["/notice" 123 test] --> '?__silta_param1=123&__silta_param2=test'
-    switch (params.length) {
-        case 0:
-            return endpoint;
-        case 1:
-            if (typeof params[0] === "object" && params[0].constructor !== Array)
-                return endpoint + makeQueryString(params[0]);
-            return endpoint; // TODO
-        default:
-            return endpoint;  // TODO
-    }
+    return endpoint + makeQueryString({"__params": JSON.stringify(params)});
 }
 
 function setupEventHandlers(rootNodeOrSelector) {

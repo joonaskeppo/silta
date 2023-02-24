@@ -1,7 +1,8 @@
 (ns silta.core
   (:require [hiccup.core :as h]
             [silta.hiccup]
-            [reitit.ring.middleware.parameters :refer [parameters-middleware]]))
+            [reitit.ring.middleware.parameters :refer [parameters-middleware]]
+            [jsonista.core :as j]))
 
 (defonce
   ^{:doc "Registry of all view components.
@@ -21,10 +22,18 @@
   "Create the renderer fn form, dependent on metadata"
   [vname metadata arglist body]
   (let [renderer-name (symbol (str "render-" vname))
-        main-fn `(fn ~renderer-name ~arglist ~@body)]
+        main-fn `(fn ~renderer-name ~arglist ~@body)
+        get-params (fn [req]
+                     (some-> req :params :__params (j/read-value j/keyword-keys-object-mapper)))
+        update-params (fn [req]
+                        (if-let [params (get-params req)]
+                          (assoc req :params params)
+                          req))]
     (cond
-      (:with-req metadata) main-fn
-      :else                `(fn [req#] (~main-fn (:params req#))))))
+      (:with-req metadata) `(comp ~main-fn ~update-params)
+      :else                `(fn [req#]
+                              (let [params# (or (~get-params req#) (:params req#))]
+                                (apply ~main-fn params#))))))
 
 ;; TODO: should try to be half-smart about compiling as much as possible
 ;; of `body` -- what can't be inferred should be handled at runtime.
@@ -35,7 +44,7 @@
   Metadata may be provided that alters how the view is used.
   Accepted boolean metadata:
   * `:with-req`, provides unaltered request map to view as input
-  * `:using`, transforms the view into a sink type with a vector of (valid) sources
+  * `:sink`, transforms the view into a sink type
 
   Optional params:
   * `docstring`, as first argument
@@ -71,7 +80,7 @@
    :headers {"Content-Type" "text/html"}
    :body html})
 
-;; TODO: expand/improve on this (currently only used for case in user ns)
+;; TODO: just use jsonista
 (defn- coerce
   [x]
   (try

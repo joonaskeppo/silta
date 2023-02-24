@@ -145,9 +145,7 @@
                   (cond
                     (view? elt) (let [{:keys [renderer]} elt
                                       args (->> (rest h) (map get-value))
-                                      req* (if (and (= 1 (count args)) (not (coll? (first args))))
-                                             (assoc req :params (first args))
-                                             (update req :params into args))
+                                      req* (update req :params into args)
                                       root (renderer req*)
                                       attrs (merge (get-attrs root)
                                                    ;; TODO: will need to refactor later
