@@ -145,7 +145,8 @@
                   (cond
                     (view? elt) (let [{:keys [renderer]} elt
                                       args (->> (rest h) (map get-value))
-                                      req* (update req :params into args)
+                                      ;; `vec` ensures order
+                                      req* (update req :params (comp #(into % args) vec))
                                       root (renderer req*)
                                       attrs (merge (get-attrs root)
                                                    ;; TODO: will need to refactor later
