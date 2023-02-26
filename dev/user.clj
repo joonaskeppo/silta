@@ -12,6 +12,11 @@
             [clojure.tools.namespace.repl :as tn]
             [mount.core :as mount]))
 
+(defview intro-text []
+  [:div
+    [:span "Hello there! "]
+    [:span "This is a a test."]])
+
 ;; sinks are similar to ordinary views,
 ;; except that they must be provided valid, derefable *sources* as inputs
 ;; (simple, self-contained SSE mechanism, no knowledge of client state)
@@ -54,6 +59,7 @@
 (def page
   (let [initial-counter 0]
     [:div
+     [intro-text]
      [test-sink +example-source+]
      [notice {:counter initial-counter}]
      [button initial-counter]
