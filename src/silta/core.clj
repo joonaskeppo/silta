@@ -61,7 +61,7 @@
         endpoint (make-endpoint (assoc props :name vname))
         renderer (make-renderer vname metadata arglist body)
         context (select-keys metadata [:sink])]
-    (assert (every? seq [arglist body]))
+    (assert (and (vector? arglist) (seq body)))
     `(do
        (def ~(with-meta vname metadata)
          (silta.hiccup.View. ~context ~endpoint ~(:before props) ~(:after props) ~renderer))
