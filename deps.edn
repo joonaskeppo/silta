@@ -10,4 +10,8 @@
  :aliases
  {:dev {:extra-paths ["dev"]
         :extra-deps {mount/mount {:mvn/version "0.1.17"}
-                     org.clojure/tools.namespace {:mvn/version "1.4.1"}}}}}
+                     org.clojure/tools.namespace {:mvn/version "1.4.1"}}}
+
+  :test {:extra-paths ["test"]
+         :extra-deps {lambdaisland/kaocha {:mvn/version "1.78.1249"}}
+         :main-opts ["-m" "kaocha.runner"]}}}
