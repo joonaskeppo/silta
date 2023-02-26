@@ -2,6 +2,7 @@
   (:require [hiccup.core :as h]
             [silta.hiccup]
             [reitit.ring.middleware.parameters :refer [parameters-middleware]]
+            [clojure.java.io :as io]
             [jsonista.core :as j]))
 
 (defonce
@@ -73,6 +74,11 @@
        (swap! view-registry assoc ~endpoint ~vname)
        ~vname)))
 
+(defn bundle-js
+  "Get Silta client-side JS script as string"
+  []
+  (slurp (io/resource "js/base.js")))
+
 (defn- render
   ([page]
    (render page nil))
@@ -111,16 +117,22 @@
                                 coerce-params-middleware]
                    :handler (comp respond-html render handler)}}])
 
+(defn- append-js
+  "Adds script tag to hiccup page definition"
+  [page]
+  (conj page [:script (bundle-js)]))
+
 (defn make-routes
-  [pages]
-  ;; TODO: mapv-vals
-  (let [views (mapv (fn [[k v]]
-                      [k (:renderer v)])
-                    @view-registry)
-        pages (mapv (fn [[k v]]
-                      [k (if (fn? v) v (constantly v))])
-                    pages)]
-    (mapv make-route (into pages views))))
+  ([pages]
+   (make-routes {:append-client-js true} pages))
+  ([opts pages]
+   (let [views (mapv (fn [[k v]]
+                       [k (:renderer v)])
+                     @view-registry)
+         pages (mapv (fn [[k v]]
+                       [k (constantly (append-js v))])
+                     pages)]
+     (mapv make-route (into pages views)))))
 
 ;; TODO:
 ;; - a let-like form (e.g., `let-views`) for small, one-off views (that still require routing, obv)

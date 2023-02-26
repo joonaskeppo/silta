@@ -8,7 +8,6 @@
             [manifold.stream]
             [hiccup.core :refer [html]]
             [clojure.core.async :as a]
-            [clojure.java.io :as io]
             [clojure.tools.namespace.repl :as tn]
             [mount.core :as mount]))
 
@@ -62,8 +61,7 @@
      [intro-text]
      [test-sink +example-source+]
      [notice {:counter initial-counter}]
-     [button initial-counter]
-     [:script (slurp (io/resource "js/base.js"))]]))
+     [button initial-counter]]))
 
 ;; --- routes ---
 
