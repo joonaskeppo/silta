@@ -59,12 +59,17 @@
         body (drop (count-not-nils [docstring arglist props]) args)
         metadata (update (meta vname) :doc #(or % docstring))
         endpoint (make-endpoint (assoc props :name vname))
-        renderer (make-renderer vname metadata arglist body)
-        context (select-keys metadata [:sink])]
+        renderer (make-renderer vname metadata arglist body)]
     (assert (and (vector? arglist) (seq body)))
     `(do
        (def ~(with-meta vname metadata)
-         (silta.hiccup.View. ~context ~endpoint ~(:before props) ~(:after props) ~renderer))
+         (silta.hiccup.View.
+          (merge ~(select-keys metadata [:sink])
+                 {:arglist '~arglist
+                  :name '~vname})
+          ~endpoint
+          ~(:before props) ~(:after props)
+          ~renderer))
        (swap! view-registry assoc ~endpoint ~vname)
        ~vname)))
 

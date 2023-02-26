@@ -81,14 +81,10 @@
     (str/starts-with? x "on")
     (str/starts-with? (subs (str x) 1) "on")))
 
-;; TODO:
-  ;; - if source and not sink -> `get-value`
-  ;; - if sink -> call `setup-sink!` and add sink-id 
-
 (defn- process-event!
   [event]
   (let [last-idx (dec (count event))
-        [view & params :as sink+params] (get event last-idx)
+        sink+params (get event last-idx)
         serialized-view (update sink+params 0 :endpoint)]
     {::events [(assoc event last-idx serialized-view)]}))
 
@@ -141,21 +137,27 @@
    (expand-hiccup h nil render-identity))
   ([h req render]
    (edit-hiccup h
-                (fn [[elt :as h]]
+                (fn [[elt & args :as h]]
                   (cond
-                    (view? elt) (let [{:keys [renderer]} elt
-                                      args (->> (rest h) (map get-value))
+                    (view? elt) (do
+                                  (let [actual-args-count (count args)
+                                        expect-args-count (count (get-in elt [:context :arglist]))]
+                                    (assert (= expect-args-count actual-args-count)
+                                            (format "View %s called with %d arg(s), expected: %d"
+                                                    (get-in elt [:context :name]) actual-args-count expect-args-count)))
+                                  (let [{:keys [renderer]} elt
+                                        args (->> args (map get-value))
                                       ;; `vec` ensures order
-                                      req* (update req :params (comp #(into % args) vec))
-                                      root (renderer req*)
-                                      attrs (merge (get-attrs root)
+                                        req* (update req :params (comp #(into % args) vec))
+                                        root (renderer req*)
+                                        attrs (merge (get-attrs root)
                                                    ;; TODO: will need to refactor later
                                                    ;; this sets up the sink for subsequent renders
-                                                   (when (sink? elt)
-                                                     (let [renderer (fn [] (render h req))]
-                                                       {:silta-sink-id (silta.sources/setup-sink! h renderer)})))
-                                      root (set-attrs root attrs)]
-                                  (expand-hiccup root req render))
+                                                     (when (sink? elt)
+                                                       (let [renderer (fn [] (render h req))]
+                                                         {:silta-sink-id (silta.sources/setup-sink! h renderer)})))
+                                        root (set-attrs root attrs)]
+                                    (expand-hiccup root req render)))
                     :else       h)))))
 
 (defn prepare-hiccup
