@@ -1,9 +1,11 @@
 (ns silta.core
-  (:require [hiccup.core :as h]
-            [silta.hiccup]
+  (:require [silta.hiccup]
+            [hiccup.core :as h]
             [reitit.ring.middleware.parameters :refer [parameters-middleware]]
+            [jsonista.core :as j]
             [clojure.java.io :as io]
-            [jsonista.core :as j]))
+            [clojure.walk :as walk]
+            [clojure.set :as set]))
 
 (defonce
   ^{:doc "Registry of all view components.
@@ -36,6 +38,48 @@
                               (let [params# (or (~get-params req#) (:params req#))]
                                 (apply ~main-fn params#))))))
 
+(defn- infer-views*
+  "Naive inference of views contained within hiccup.
+  Does not recur, infers views only in current view."
+  [h]
+  (let [views-found (atom #{})
+        add-view    #(do (swap! views-found conj %1) %2)]
+    (walk/postwalk
+     (fn [x]
+       (cond
+         (silta.hiccup/view? x) (add-view x x)
+         (symbol? x)            (try
+                                  (let [?view (-> x resolve var-get)]
+                                    (if (silta.hiccup/view? ?view)
+                                      (add-view ?view x)
+                                      x))
+                                  (catch Exception _ x))
+         :else                  x))
+     h)
+    @views-found))
+
+(defn infer-views
+  "Infer views contained within view or hiccup.
+  Does not recur, infers views only in current view/hiccup."
+  [x]
+  (cond
+    (silta.hiccup/view? x)    (infer-views* (get-in x [:context :body]))
+    (silta.hiccup/hiccup+? x) (infer-views* x)
+    :else                          (throw (ex-info "Unable to infer views for data:"
+                                                   {:data x}))))
+
+(defn infer-all-views
+  "Infer all views recursively"
+  ([x]
+   (infer-all-views x #{}))
+  ([x views-so-far]
+   (let [next-views       (infer-views x)
+         unexplored-views (set/difference next-views views-so-far)
+         all-known-views  (set/union views-so-far next-views)]
+     (if (seq unexplored-views)
+       (set (mapcat #(infer-all-views % all-known-views) unexplored-views))
+       all-known-views))))
+
 ;; TODO: should try to be half-smart about compiling as much as possible
 ;; of `body` -- what can't be inferred should be handled at runtime.
 (defmacro defview
@@ -66,8 +110,7 @@
        (def ~(with-meta vname metadata)
          (silta.hiccup.View.
           (merge ~(select-keys metadata [:sink])
-                 {:arglist '~arglist
-                  :name '~vname})
+                 {:arglist '~arglist :body '~body :name '~vname})
           ~endpoint
           ~(:before props) ~(:after props)
           ~renderer))
@@ -126,13 +169,15 @@
   ([pages]
    (make-routes {:append-client-js true} pages))
   ([opts pages]
-   (let [views (mapv (fn [[k v]]
-                       [k (:renderer v)])
-                     @view-registry)
-         pages (mapv (fn [[k v]]
-                       [k (constantly (append-js v))])
-                     pages)]
-     (mapv make-route (into pages views)))))
+   (let [page-routes (->> pages
+                          (mapv (fn [[k v]]
+                                  [k (constantly (append-js v))])))
+         view-routes (->> pages
+                          (mapcat (comp (fn [views]
+                                          (mapv (juxt :endpoint :renderer) views))
+                                        infer-all-views
+                                        second)))]
+     (mapv make-route (into page-routes view-routes)))))
 
 ;; TODO:
 ;; - a let-like form (e.g., `let-views`) for small, one-off views (that still require routing, obv)
