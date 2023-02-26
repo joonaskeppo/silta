@@ -45,16 +45,6 @@
 (defn- get-endpoints [pages]
   (->> pages make-routes (map first) set))
 
-(def endpoints-1
-  (get-endpoints [["/" test-page-1]]))
-
-(def endpoints-2
-  (get-endpoints [["/" test-page-2]]))
-
-(comment
-  (map (comp :name :context) (infer-all-views vc))
-  (map (comp :name :context) (infer-all-views test-page-1)))
-
 ;; --- tests ---
 
 (deftest test-defview
@@ -86,7 +76,8 @@
             [vb 1 1]]
            ((:renderer vc) {:params [1]})))))
 
-;; FIXME: for whatever reason, if we invoke the `get-endpoints` fn within deftest, we get an incomplete result for the first assertion
 (deftest test-make-routes
-  (is (= #{"/" "/va" "/vb" "/vc"} endpoints-1))
-  (is (= #{"/" "/va"} endpoints-2)))
+  (let [endpoint (get-endpoints [["/" test-page-1]])]
+    (is (= #{"/" "/va" "/vb" "/vc"} endpoint)))
+  (let [endpoint (get-endpoints [["/" test-page-2]])]
+    (is (= #{"/" "/va"} endpoint))))
