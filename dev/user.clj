@@ -66,28 +66,7 @@
 ;; --- routes ---
 
 (def routes
-  (into (make-routes [["/" page]])
-        [["/stream" (fn [req]
-                      (let [ping-result (Object.)
-                            xform (comp (mapcat (fn [x]
-                                                  (if (= x ping-result)
-                                                    ["ping"]
-                                                    [x])))
-                                        (map (fn [msg]
-                                               (str "\ndata:" msg "\n"))))
-                            formatted-chan (a/chan 1 xform)]
-                        (a/go-loop
-                         []
-                          (a/<! (a/timeout 1000))
-                          (if (a/>! formatted-chan ping-result)
-                            (recur)
-                            (println "Channel closed!")))
-                        (a/pipe ss/source-chan formatted-chan)
-                        {:status 200
-                         :body (manifold.stream/->source formatted-chan)
-                         :headers {"Content-Type" "text/event-stream;charset=UTF-8"
-                                   "Cache-Control" "no-cache, no-store, max-age=0, must-revalidate"
-                                   "Pragma" "no-cache"}}))]]))
+  (make-routes [["/" page]]))
 
 ;; --- app ---
 
@@ -118,4 +97,4 @@
   (sh/prepare-hiccup page)
 
   ;; update value, should be reflected in sink view
-  (reset! +example-source+ "Asdasd"))
+  (reset! +example-source+ "NEW VALUE"))

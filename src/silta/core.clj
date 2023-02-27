@@ -1,5 +1,6 @@
 (ns silta.core
   (:require [silta.hiccup]
+            [silta.sse]
             [hiccup.core :as h]
             [reitit.ring.middleware.parameters :refer [parameters-middleware]]
             [jsonista.core :as j]
@@ -15,11 +16,21 @@
 
 (defn- make-endpoint
   "Generate endpoint route for view"
-  [{:keys [path name] :as props}]
+  [{:keys [path name] :as _props}]
   (or path (str "/" name)))
 
 (def ^:private count-not-nils
   (comp count (partial filter some?)))
+
+(defn- json->clj
+  "Convert (seq of) JSON into Clojure data"
+  [v]
+  (cond
+    (string? v)     (try
+                      (j/read-value v j/keyword-keys-object-mapper)
+                      (catch Exception _ v))
+    (sequential? v) (mapv json->clj v)
+    :else           v))
 
 (defn- make-renderer
   "Create the renderer fn form, dependent on metadata"
@@ -27,7 +38,7 @@
   (let [renderer-name (symbol (str "render-" vname))
         main-fn `(fn ~renderer-name ~arglist ~@body)
         get-params (fn [req]
-                     (some-> req :params :__params (j/read-value j/keyword-keys-object-mapper)))
+                     (some-> req :params :__params json->clj))
         update-params (fn [req]
                         (if-let [params (get-params req)]
                           (assoc req :params params)
@@ -137,23 +148,13 @@
    :headers {"Content-Type" "text/html"}
    :body html})
 
-;; TODO: just use jsonista
-(defn- coerce
-  [x]
-  (try
-    ;; TODO: float
-    (let [x* (Integer/parseInt x)]
-      x*)
-    (catch Exception _
-      x)))
-
 (defn- coerce-params-middleware
   [handler & _args]
   (fn [req]
     (-> req
-        (update :params (comp (partial into {})
-                              (partial map (fn [[k v]]
-                                             [(keyword k) (coerce v)]))))
+        (update :params (partial reduce-kv (fn [m k v]
+                                              (assoc m (keyword k) (json->clj v)))
+                                           {}))
         handler)))
 
 (defn- make-route
@@ -172,21 +173,37 @@
   "Should SSE be set up by default?
   Returns true if view registry contains at least one sink."
   []
-  (some (comp silta.hiccup/sink? second) @view-registry))
+  (->> @view-registry
+       (some (comp silta.hiccup/sink? second))
+       boolean))
 
+(defn- use-sse?
+  "Should we add SSE for page?"
+  [page-opts]
+  (if (contains? page-opts :sse)
+    (:sse page-opts)
+    (get-default-sse-setting)))
+
+;; TODO: we should also handle page-specific opts to disable/enable SSE, etc.
+;; (however, `make-routes` should work more or less as-is; more to do with JS side...)
 (defn make-routes
   ([pages]
    (make-routes {:append-client-js true} pages))
   ([opts pages]
-   (let [page-routes (->> pages
-                          (mapv (fn [[k v]]
-                                  [k (constantly
-                                       (if (:append-client-js opts)
-                                         (append-js v) v))])))
+   (let [live-routes [["/stream" silta.sse/sse-handler]]
+         page-routes (->> pages
+                          (mapv (fn [[endpoint & rem]]
+                                  (let [page (last rem)]
+                                    [endpoint (constantly
+                                                (if (:append-client-js opts)
+                                                  (append-js page)
+                                                  page))]))))
          view-routes (->> @view-registry
                           (mapv (fn [[endpoint view]]
                                   [endpoint (:renderer view)])))]
-     (mapv make-route (into page-routes view-routes)))))
+     (->> (into page-routes view-routes)
+          (mapv make-route)
+          (into live-routes)))))
 
 ;; TODO:
 ;; - a let-like form (e.g., `let-views`) for small, one-off views (that still require routing, obv)
