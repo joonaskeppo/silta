@@ -66,7 +66,8 @@
 ;; --- routes ---
 
 (def routes
-  (make-routes [["/" page]]))
+  ;; we can trigger sse on/off
+  (make-routes [["/" #_{:sse false} page]]))
 
 ;; --- app ---
 

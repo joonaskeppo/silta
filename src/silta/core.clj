@@ -1,9 +1,11 @@
 (ns silta.core
   (:require [silta.hiccup]
             [silta.sse]
+            [silta.utils :refer [map-vals]]
             [hiccup.core :as h]
             [reitit.ring.middleware.parameters :refer [parameters-middleware]]
             [jsonista.core :as j]
+            [clojure.string :as str]
             [clojure.java.io :as io]
             [clojure.walk :as walk]
             [clojure.set :as set]))
@@ -131,10 +133,19 @@
        (swap! view-registry assoc ~endpoint ~vname)
        ~vname)))
 
+(def js-files
+  (->> {:base "base.js"
+        :sse "sse.js"}
+       (map-vals (comp slurp io/resource (partial str "js/")))))
+
 (defn bundle-js
   "Get Silta client-side JS script as string"
-  []
-  (slurp (io/resource "js/base.js")))
+  ([]
+   (bundle-js {:sse true}))
+  ([{:keys [sse] :as _opts}]
+   (if sse
+     (->> js-files vals (str/join "\n"))
+     (->> js-files :base))))
 
 (defn- render
   ([page]
@@ -153,8 +164,8 @@
   (fn [req]
     (-> req
         (update :params (partial reduce-kv (fn [m k v]
-                                              (assoc m (keyword k) (json->clj v)))
-                                           {}))
+                                             (assoc m (keyword k) (json->clj v)))
+                                 {}))
         handler)))
 
 (defn- make-route
@@ -166,8 +177,8 @@
 
 (defn- append-js
   "Adds script tag to hiccup page definition"
-  [page]
-  (conj page [:script (bundle-js)]))
+  [opts page]
+  (conj page [:script (bundle-js opts)]))
 
 (defn- get-default-sse-setting
   "Should SSE be set up by default?
@@ -184,26 +195,33 @@
     (:sse page-opts)
     (get-default-sse-setting)))
 
+(def default-page-opts
+  "Default page options.
+  Used for configuring routes and client-side JavaScript."
+  {:append-client-js true
+   :sse true})
+
 ;; TODO: we should also handle page-specific opts to disable/enable SSE, etc.
 ;; (however, `make-routes` should work more or less as-is; more to do with JS side...)
 (defn make-routes
-  ([pages]
-   (make-routes {:append-client-js true} pages))
-  ([opts pages]
-   (let [live-routes [["/stream" silta.sse/sse-handler]]
-         page-routes (->> pages
-                          (mapv (fn [[endpoint & rem]]
-                                  (let [page (last rem)]
-                                    [endpoint (constantly
-                                                (if (:append-client-js opts)
-                                                  (append-js page)
-                                                  page))]))))
-         view-routes (->> @view-registry
-                          (mapv (fn [[endpoint view]]
-                                  [endpoint (:renderer view)])))]
-     (->> (into page-routes view-routes)
-          (mapv make-route)
-          (into live-routes)))))
+  [pages]
+  (let [live-routes [["/stream" silta.sse/sse-handler]]
+        page-routes (->> pages
+                         (mapv (fn [[endpoint & rem]]
+                                 (let [page (last rem)
+                                       opts (if (map? (first rem))
+                                              (merge default-page-opts (first rem))
+                                              default-page-opts)]
+                                   [endpoint (constantly
+                                              (if (:append-client-js opts)
+                                                (append-js opts page)
+                                                page))]))))
+        view-routes (->> @view-registry
+                         (mapv (fn [[endpoint view]]
+                                 [endpoint (:renderer view)])))]
+    (->> (into page-routes view-routes)
+         (mapv make-route)
+         (into live-routes))))
 
 ;; TODO:
 ;; - a let-like form (e.g., `let-views`) for small, one-off views (that still require routing, obv)

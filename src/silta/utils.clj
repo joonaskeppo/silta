@@ -9,14 +9,14 @@
     m))
 
 (defn map-vals
-  [m f]
+  [f m]
   (->> m
        (map (fn [[k v]]
               [k (f v)]))
        (into {})))
 
 (defn map-keys
-  [m f]
+  [f m]
   (->> m
        (map (fn [[k v]]
               [(f k) v]))
