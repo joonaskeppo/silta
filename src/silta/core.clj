@@ -38,47 +38,50 @@
                               (let [params# (or (~get-params req#) (:params req#))]
                                 (apply ~main-fn params#))))))
 
-(defn- infer-views*
-  "Naive inference of views contained within hiccup.
+;; these inferences are unused as of now
+;; they don't generalize fully (symbol may not be resolve properly to a view)
+(comment
+  (defn- infer-views*
+    "Naive inference of views contained within hiccup.
   Does not recur, infers views only in current view."
-  [h]
-  (let [views-found (atom #{})
-        add-view    #(do (swap! views-found conj %1) %2)]
-    (walk/postwalk
-     (fn [x]
-       (cond
-         (silta.hiccup/view? x) (add-view x x)
-         (symbol? x)            (try
-                                  (let [?view (-> x resolve var-get)]
-                                    (if (silta.hiccup/view? ?view)
-                                      (add-view ?view x)
-                                      x))
-                                  (catch Exception _ x))
-         :else                  x))
-     h)
-    @views-found))
+    [h]
+    (let [views-found (atom #{})
+          add-view    #(do (swap! views-found conj %1) %2)]
+      (walk/postwalk
+       (fn [x]
+         (cond
+           (silta.hiccup/view? x) (add-view x x)
+           (symbol? x)            (try
+                                    (let [?view (-> x resolve var-get)]
+                                      (if (silta.hiccup/view? ?view)
+                                        (add-view ?view x)
+                                        x))
+                                    (catch Exception _ x))
+           :else                  x))
+       h)
+      @views-found))
 
-(defn infer-views
-  "Infer views contained within view or hiccup.
+  (defn infer-views
+    "Infer views contained within view or hiccup.
   Does not recur, infers views only in current view/hiccup."
-  [x]
-  (cond
-    (silta.hiccup/view? x)    (infer-views* (get-in x [:context :body]))
-    (silta.hiccup/hiccup+? x) (infer-views* x)
-    :else                          (throw (ex-info "Unable to infer views for data:"
-                                                   {:data x}))))
+    [x]
+    (cond
+      (silta.hiccup/view? x)    (infer-views* (get-in x [:context :body]))
+      (silta.hiccup/hiccup+? x) (infer-views* x)
+      :else                          (throw (ex-info "Unable to infer views for data:"
+                                                     {:data x}))))
 
-(defn infer-all-views
-  "Infer all views recursively"
-  ([x]
-   (infer-all-views x #{}))
-  ([x views-so-far]
-   (let [next-views       (infer-views x)
-         unexplored-views (set/difference next-views views-so-far)
-         all-known-views  (set/union views-so-far next-views)]
-     (if (seq unexplored-views)
-       (set (mapcat #(infer-all-views % all-known-views) unexplored-views))
-       all-known-views))))
+  (defn infer-all-views
+    "Infer all views recursively"
+    ([x]
+     (infer-all-views x #{}))
+    ([x views-so-far]
+     (let [next-views       (infer-views x)
+           unexplored-views (set/difference next-views views-so-far)
+           all-known-views  (set/union views-so-far next-views)]
+       (if (seq unexplored-views)
+         (set (mapcat #(infer-all-views % all-known-views) unexplored-views))
+         all-known-views)))))
 
 ;; TODO: should try to be half-smart about compiling as much as possible
 ;; of `body` -- what can't be inferred should be handled at runtime.
@@ -110,7 +113,7 @@
        (def ~(with-meta vname metadata)
          (silta.hiccup.View.
           (merge ~(select-keys metadata [:sink])
-                 {:arglist '~arglist :body '~body :name '~vname})
+                 {:arglist '~arglist :name '~vname})
           ~endpoint
           ~(:before props) ~(:after props)
           ~renderer))
@@ -165,18 +168,24 @@
   [page]
   (conj page [:script (bundle-js)]))
 
+(defn- get-default-sse-setting
+  "Should SSE be set up by default?
+  Returns true if view registry contains at least one sink."
+  []
+  (some (comp silta.hiccup/sink? second) @view-registry))
+
 (defn make-routes
   ([pages]
    (make-routes {:append-client-js true} pages))
   ([opts pages]
    (let [page-routes (->> pages
                           (mapv (fn [[k v]]
-                                  [k (constantly (append-js v))])))
-         view-routes (->> pages
-                          (mapcat (comp (fn [views]
-                                          (mapv (juxt :endpoint :renderer) views))
-                                        infer-all-views
-                                        second)))]
+                                  [k (constantly
+                                       (if (:append-client-js opts)
+                                         (append-js v) v))])))
+         view-routes (->> @view-registry
+                          (mapv (fn [[endpoint view]]
+                                  [endpoint (:renderer view)])))]
      (mapv make-route (into page-routes view-routes)))))
 
 ;; TODO:

@@ -12,5 +12,5 @@ jobs:
         with:
           cli: "latest" # Clojure CLI, tools.deps
 
-      - name: Run backend tests
+      - name: Run unit tests
         run: bin/kaocha

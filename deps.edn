@@ -8,7 +8,7 @@
         metosin/jsonista {:mvn/version "0.3.7"}}
 
  :aliases
- {:dev {:extra-paths ["dev"]
+ {:dev {:extra-paths ["dev" "test"]
         :extra-deps {mount/mount {:mvn/version "0.1.17"}
                      org.clojure/tools.namespace {:mvn/version "1.4.1"}}}
 

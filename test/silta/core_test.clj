@@ -1,6 +1,7 @@
 (ns silta.core-test
   (:require [clojure.test :refer [deftest is testing]]
-            [silta.core :refer [defview make-routes infer-all-views]]
+            [clojure.set :as set]
+            [silta.core :refer [defview make-routes]]
             [silta.hiccup :refer [sink? view?]]))
 
 ;; --- helpers ---
@@ -30,13 +31,10 @@
 (defonce test-atom
   (atom 1))
 
-(def test-page-1
+(def test-page
   [:div
    [:h1 "Test page"]
    [vc test-atom]])
-
-(def test-page-2
-  [va])
 
 (defn- non-sink-view?
   [v]
@@ -77,7 +75,5 @@
            ((:renderer vc) {:params [1]})))))
 
 (deftest test-make-routes
-  (let [endpoint (get-endpoints [["/" test-page-1]])]
-    (is (= #{"/" "/va" "/vb" "/vc"} endpoint)))
-  (let [endpoint (get-endpoints [["/" test-page-2]])]
-    (is (= #{"/" "/va"} endpoint))))
+  (testing "with test page, should set up routes for all views + SSE route due to sink"
+    (is (set/subset? #{"/" "/va" "/vb" "/vc"} (get-endpoints [["/" test-page]])))))
