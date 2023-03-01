@@ -29,7 +29,7 @@
 ;; if we want the full request map, we should redefine `:before`
 
 (defview notice
-  {:before #(%1 %2)}
+  {:before identity}
   [{[{:keys [counter]}] :params :as p}]
   [:div {:id "notice"}
    (if (zero? counter)
@@ -37,7 +37,7 @@
      (format "Clicked %s times..." counter))])
 
 (defview test-appender
-  {:before #(%1 %2)}
+  {:before identity}
   [{[{:keys [counter]}] :params}]
   [:span (apply str (take counter (repeat ".")))])
 

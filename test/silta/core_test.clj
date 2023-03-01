@@ -17,7 +17,7 @@
    [:span (format "y is %s" y)]])
 
 (defview vb*
-  {:before #(%1 %2)}
+  {:before identity}
   [{[x y] :params :as _request}]
   [:div
    [:span (format "x is %s" x)]
@@ -59,7 +59,7 @@
             [:span "x is 1"]
             [:span "y is 2"]]
            ((:renderer vb) {:params [1 2]}))))
-  (testing "with `:with-req`"
+  (testing "with full request map"
     (is (non-sink-view? vb*))
     (is (= "/vb*" (:endpoint vb*)))
     (is (= [:div

@@ -41,12 +41,16 @@
   (let [renderer-name (symbol (str "render-" (:name context)))
         main-fn `(fn ~renderer-name ~(:arglist context) ~body)
         get-params (fn [req]
-                     (some-> req :params :__params json->clj))
+                     (or (some-> req :params :__params json->clj)
+                         (:params req)
+                         []))
+        apply-req (fn [renderer req]
+                    (if (vector? req)
+                      (apply renderer req)
+                      (renderer req)))
         update-params (fn [req]
-                        (if-let [params (get-params req)]
-                          (assoc req :params params)
-                          req))]
-  `(comp ~after (partial ~before ~main-fn) ~update-params)))
+                        (assoc req :params (get-params req)))]
+  `(comp ~after (partial ~apply-req ~main-fn) ~before ~update-params)))
 
 (defn- get-view-arg
   [args pred predated-by]
@@ -55,8 +59,7 @@
 
 (def default-props
   ;; pull out `:params` from (HTTP) request by default
-  {:before (fn [renderer {:keys [params]}]
-             (apply renderer params))
+  {:before :params
    :after identity})
 
 ;; TODO: should try to be half-smart about compiling as much as possible
