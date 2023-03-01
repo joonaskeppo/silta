@@ -29,12 +29,17 @@
 ;; if we want the full request map, we should redefine `:before`
 
 (defview notice
-  {:before identity}
-  [{[{:keys [counter]}] :params :as p}]
+  "This is a notice"
+  {:before (fn [req]
+             (->  req
+                  (assoc :client-id (get-in req [:headers "client-id"] " (not received yet)"))))}
+  [{[{:keys [counter]}] :params :keys [client-id] :as req}]
   [:div {:id "notice"}
-   (if (zero? counter)
-     "No clicks here"
-     (format "Clicked %s times..." counter))])
+   [:div (format "Client id: %s" client-id)]
+   [:div
+    (if (zero? counter)
+      "No clicks here"
+      (format "Clicked %s times..." counter))]])
 
 (defview test-appender
   {:before identity}

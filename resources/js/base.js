@@ -3,6 +3,8 @@
 const eventsAttr = 'silta-events';
 const eventsSelector = '[' + eventsAttr + ']';
 
+const clientId = self.crypto.randomUUID();
+
 function findElementsWithEventsUnderNode(node) {
     let entries = [];
 
@@ -81,6 +83,8 @@ function setupEventHandlers(rootNodeOrSelector) {
 
 function handleAjaxRequest(req, props) {
     let xhr = new XMLHttpRequest();
+
+
     // response handling
     xhr.onreadystatechange = function() {
         if (xhr.readyState === XMLHttpRequest.DONE && xhr.status === 200) {
@@ -89,6 +93,7 @@ function handleAjaxRequest(req, props) {
     }
     // send request
     xhr.open(req.method, req.url);
+    xhr.setRequestHeader('client-id', clientId);
     xhr.send();
 }
 
