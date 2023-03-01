@@ -16,7 +16,8 @@
    [:span (format "x is %s" x)]
    [:span (format "y is %s" y)]])
 
-(defview ^:with-req vb*
+(defview vb*
+  {:before #(%1 %2)}
   [{[x y] :params :as _request}]
   [:div
    [:span (format "x is %s" x)]

@@ -36,65 +36,28 @@
 
 (defn- make-renderer
   "Create the renderer fn form, dependent on metadata"
-  [vname metadata arglist body]
-  (let [renderer-name (symbol (str "render-" vname))
-        main-fn `(fn ~renderer-name ~arglist ~@body)
+  [{:keys [context body]
+    {:keys [before after]} :props}]
+  (let [renderer-name (symbol (str "render-" (:name context)))
+        main-fn `(fn ~renderer-name ~(:arglist context) ~body)
         get-params (fn [req]
                      (some-> req :params :__params json->clj))
         update-params (fn [req]
                         (if-let [params (get-params req)]
                           (assoc req :params params)
                           req))]
-    (cond
-      (:with-req metadata) `(comp ~main-fn ~update-params)
-      :else                `(fn [req#]
-                              (let [params# (or (~get-params req#) (:params req#))]
-                                (apply ~main-fn params#))))))
+  `(comp ~after (partial ~before ~main-fn) ~update-params)))
 
-;; these inferences are unused as of now
-;; they don't generalize fully (symbol may not be resolve properly to a view)
-(comment
-  (defn- infer-views*
-    "Naive inference of views contained within hiccup.
-  Does not recur, infers views only in current view."
-    [h]
-    (let [views-found (atom #{})
-          add-view    #(do (swap! views-found conj %1) %2)]
-      (walk/postwalk
-       (fn [x]
-         (cond
-           (silta.hiccup/view? x) (add-view x x)
-           (symbol? x)            (try
-                                    (let [?view (-> x resolve var-get)]
-                                      (if (silta.hiccup/view? ?view)
-                                        (add-view ?view x)
-                                        x))
-                                    (catch Exception _ x))
-           :else                  x))
-       h)
-      @views-found))
+(defn- get-view-arg
+  [args pred predated-by]
+  (when-let [?arg (-> (count-not-nils predated-by) (drop args) first)]
+    (when (pred ?arg) ?arg)))
 
-  (defn infer-views
-    "Infer views contained within view or hiccup.
-  Does not recur, infers views only in current view/hiccup."
-    [x]
-    (cond
-      (silta.hiccup/view? x)    (infer-views* (get-in x [:context :body]))
-      (silta.hiccup/hiccup+? x) (infer-views* x)
-      :else                          (throw (ex-info "Unable to infer views for data:"
-                                                     {:data x}))))
-
-  (defn infer-all-views
-    "Infer all views recursively"
-    ([x]
-     (infer-all-views x #{}))
-    ([x views-so-far]
-     (let [next-views       (infer-views x)
-           unexplored-views (set/difference next-views views-so-far)
-           all-known-views  (set/union views-so-far next-views)]
-       (if (seq unexplored-views)
-         (set (mapcat #(infer-all-views % all-known-views) unexplored-views))
-         all-known-views)))))
+(def default-props
+  ;; pull out `:params` from (HTTP) request by default
+  {:before (fn [renderer {:keys [params]}]
+             (apply renderer params))
+   :after identity})
 
 ;; TODO: should try to be half-smart about compiling as much as possible
 ;; of `body` -- what can't be inferred should be handled at runtime.
@@ -111,24 +74,24 @@
   * `docstring`, as first argument
   * `condition-map`, after `arglist`; recognized keys are `:before`, `:after`, and `:path`"
   [vname & args]
-  (let [docstring (when (string? (first args)) (first args))
-        arglist (if docstring
-                  (when (vector? (second args)) (second args))
-                  (when (vector? (first args)) (first args)))
-        props (when-let [?props (first (drop (count-not-nils [docstring arglist]) args))]
-                (when (map? ?props) ?props))
-        body (drop (count-not-nils [docstring arglist props]) args)
+  (let [docstring (get-view-arg args string? [])
+        props (get-view-arg args map? [docstring])
+        arglist (get-view-arg args vector? [docstring props])
+        body (get-view-arg args any? [docstring props arglist])
         metadata (update (meta vname) :doc #(or % docstring))
         endpoint (make-endpoint (assoc props :name vname))
-        renderer (make-renderer vname metadata arglist body)]
-    (assert (and (vector? arglist) (seq body)))
+        final-props (merge default-props props)
+        renderer (make-renderer {:context {:arglist arglist :name vname}
+                                 :props final-props
+                                 :body body})]
+    (assert (vector? arglist) (format "Missing arglist from view '%s'" vname))
     `(do
        (def ~(with-meta vname metadata)
          (silta.hiccup.View.
           (merge ~(select-keys metadata [:sink])
                  {:arglist '~arglist :name '~vname})
           ~endpoint
-          ~(:before props) ~(:after props)
+          ~final-props
           ~renderer))
        (swap! view-registry assoc ~endpoint ~vname)
        ~vname)))
@@ -188,24 +151,18 @@
        (some (comp silta.hiccup/sink? second))
        boolean))
 
-(defn- use-sse?
-  "Should we add SSE for page?"
-  [page-opts]
-  (if (contains? page-opts :sse)
-    (:sse page-opts)
-    (get-default-sse-setting)))
-
-(def default-page-opts
+(defn get-default-page-opts []
   "Default page options.
   Used for configuring routes and client-side JavaScript."
   {:append-client-js true
-   :sse true})
+   :sse (get-default-sse-setting)})
 
 ;; TODO: we should also handle page-specific opts to disable/enable SSE, etc.
 ;; (however, `make-routes` should work more or less as-is; more to do with JS side...)
 (defn make-routes
   [pages]
-  (let [live-routes [["/stream" silta.sse/sse-handler]]
+  (let [default-page-opts (get-default-page-opts)
+        live-routes [["/stream" silta.sse/sse-handler]]
         page-routes (->> pages
                          (mapv (fn [[endpoint & rem]]
                                  (let [page (last rem)

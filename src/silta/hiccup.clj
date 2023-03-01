@@ -10,7 +10,7 @@
  ^{:doc "An atomic view component with optional (potentially side-effectful) `before` and `after` fns.
     See `defview` for further documentation."}
  View
- [context endpoint before after renderer])
+ [context endpoint props renderer])
 
 (defn view? [x]
   (instance? View x))

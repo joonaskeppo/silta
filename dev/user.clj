@@ -13,8 +13,8 @@
 
 (defview intro-text []
   [:div
-    [:span "Hello there! "]
-    [:span "This is a a test."]])
+   [:span "Hello there! "]
+   [:span "This is a a test."]])
 
 ;; sinks are similar to ordinary views,
 ;; except that they must be provided valid, derefable *sources* as inputs
@@ -25,27 +25,32 @@
   [:div
    [:span xv]])
 
-;; by default, only show `:params` from req, for convenience. if we want the full request map, we should 
-;; decorate it with the `^:with-req` meta prop
+;; by default, only show `:params` from req, for convenience.
+;; if we want the full request map, we should redefine `:before`
 
-(defview ^:with-req notice
+(defview notice
+  {:before #(%1 %2)}
   [{[{:keys [counter]}] :params :as p}]
   [:div {:id "notice"}
    (if (zero? counter)
      "No clicks here"
      (format "Clicked %s times..." counter))])
 
-(defview ^:with-req test-appender
+(defview test-appender
+  {:before #(%1 %2)}
   [{[{:keys [counter]}] :params}]
   [:span (apply str (take counter (repeat ".")))])
 
 (defview button
+  {:after (fn [res]
+            (tap> [:button/after res])
+            res)}
   [counter]
   [:button {:on-click [[:swap {:target "#notice"}
                         [notice {:counter (inc counter)}]]  ;; replaces arbitrary elements with querySelectorAll
                        ;; FIXME: need to have a way to deal with sequential updates
                        #_[:append {:target "#notice"}
-                        [test-appender {:counter (inc counter)}]] ;; append dots
+                          [test-appender {:counter (inc counter)}]] ;; append dots
                        [:swap
                         [button (inc counter)]]]} ;; replace this specific `button` DOM element
    (if (zero? counter)
