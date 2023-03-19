@@ -5,9 +5,13 @@
 (extend-protocol Sourceable
   clojure.lang.Atom
   (connect! [this callback]
-    (add-watch this ::source-change (fn [_ the-atom _ _] (callback the-atom))))
+    (let [key (hash callback)]
+      (add-watch this key (fn [_ the-atom _ _] (callback the-atom)))
+      (alter-meta! this update ::callbacks (comp set conj) key)))
   (disconnect! [this]
-    (remove-watch this ::source-change))
+    (doseq [key (::callbacks (meta this))]
+      (remove-watch this key))
+    (alter-meta! this dissoc ::callbacks))
   (get-value [this]
     (deref this)))
 

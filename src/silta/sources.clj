@@ -19,9 +19,12 @@
   (a/chan))
 
 (defprotocol Sourceable
-  (connect! [this callback] "Call callback fn when source updates")
-  (disconnect! [this] "Sever connection to callback")
-  (get-value [this] "Return current source value, like `deref`"))
+  (connect! [this callback]
+    "Ensure `callback` fn is called when source (`this`) updates. Should be idempotent.")
+  (disconnect! [this]
+    "Sever source's (`this`) connection to `callback`. Should be idempotent.")
+  (get-value [this]
+    "Return current source (`this`) value, similarly to `deref`."))
 
 (defn source? [x]
   (satisfies? Sourceable x))
@@ -43,13 +46,21 @@
             :let [renderer (get @renderer-registry sink-id)]]
       (a/put! source-chan (renderer)))))
 
+(defn ->value
+  "Ensure `p` is coerced into a static value, if Sourceable.
+  Returns `p` if not Sourceable."
+  [p]
+  (if (source? p) (get-value p) p))
+
 (defn setup-sink!
-  "Setup sink with provided params, and `renderer` to call when one of the provided sources (one or more `params`) updates"
-  [[_sink & params :as sink+params] renderer]
-  (assert (every? source? params)) ;; for now..? NOTE: unnecessary restriction, will remove later
-  (let [sink-id (hash sink+params)]
-    (doseq [source params]
-      (add-sink source sink-id renderer)
-      (connect! source trigger-update!))
+  "Setup sink with provided params.
+  Calls sink's renderer when any Sourceable param updates.
+  Idempotent; not affected by additional calls due to re-renders."
+  [[sink & params :as view+params]]
+  (let [sink-id (hash view+params)]
+    (when-not (get @renderer-registry sink-id)
+      (doseq [source (filter source? params)]
+        (add-sink source sink-id (:renderer sink))
+        (connect! source trigger-update!)))
     sink-id))
 
