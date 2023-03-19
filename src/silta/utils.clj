@@ -1,6 +1,7 @@
 (ns silta.utils
   "Common utility fns"
-  (:require [clojure.string :as str]))
+  (:require [clojure.string :as str]
+            [jsonista.core :as j]))
 
 (defn update-if-key
   [m k f]
@@ -22,22 +23,17 @@
               [(f k) v]))
        (into {})))
 
-(defn jsonify
-  "Quick and dirty JSON serialization for a small subset of Clojure.
-  Used for transforming Silta data into JSON for frontend consumption,
-  via Silta HTML tags."
-  [x]
+(defn json->clj
+  "Convert (seq of) JSON into Clojure data using jsonista"
+  [v]
   (cond
-    (map? x)          (->> x
-                           (map (fn [[k v]]
-                                  (format "%s: %s" (jsonify k) (jsonify v))))
-                           (str/join ", ")
-                           (format "{%s}"))
-    (sequential? x)   (->> x (map jsonify) (str/join ", ") (format "[%s]"))
-    (keyword? x)      (->> (subs (str x) 1) (format "\"%s\""))
-    (number? x)       (str x)
-    (string? x)       (format "\"%s\"" x)
-    :else             (throw (ex-info "Unable to serialize data!"
-                                      {:data x :type (type x)})))) 
+    (string? v)     (try
+                      (j/read-value v j/keyword-keys-object-mapper)
+                      (catch Exception _ v))
+    (sequential? v) (mapv json->clj v)
+    :else           v))
 
+(def clj->json
+  "Convert clj data into a JSON string using jsonista"
+  j/write-value-as-string)
 

@@ -2,6 +2,7 @@
   (:require [silta.hiccup]
             [silta.sse]
             [silta.utils :refer [map-vals]]
+            [silta.adapter]
             [hiccup.core :as h]
             [reitit.ring.middleware.parameters :refer [parameters-middleware]]
             [jsonista.core :as j]
@@ -35,11 +36,14 @@
     :else           v))
 
 (defn- make-renderer
-  "Create the renderer fn form, dependent on metadata"
+  "Create the renderer fn form, dependent on metadata.
+  Tries to pre-process as much of `body` as possible."
   [{:keys [context body]
     {:keys [before after]} :props}]
-  (let [renderer-name (symbol (str "render-" (:name context)))
-        main-fn `(fn ~renderer-name ~(:arglist context) ~body)
+  (let [view-name (:name context)
+        renderer-name (symbol (str "render-" view-name))
+        main-fn `(fn ~renderer-name ~(:arglist context)
+                   (silta.adapter/process {:view-name ~(format "%s/%s" *ns* view-name)} ~body))
         get-params (fn [req]
                      (or (some-> req :params :__params json->clj)
                          (:params req)
@@ -62,16 +66,13 @@
   {:before :params
    :after identity})
 
-;; TODO: should try to be half-smart about compiling as much as possible
-;; of `body` -- what can't be inferred should be handled at runtime.
 (defmacro defview
   "Create a view component
   Invoked similarly to `defn`.
 
   Metadata may be provided that alters how the view is used.
   Accepted boolean metadata:
-  * `:with-req`, provides unaltered request map to view as input
-  * `:sink`, transforms the view into a sink type
+  * `:sink`, transforms the view into a sink type when true
 
   Optional params:
   * `docstring`, as first argument
@@ -113,11 +114,13 @@
      (->> js-files vals (str/join "\n"))
      (->> js-files :base))))
 
+;; TODO: deprecate this in favor of wrapping view renderer's with
+;; `html` and `adapt`
 (defn- render
   ([page]
    (render page nil))
-  ([page req] ;; TODO: is `req` actually used currently?
-   (-> page (silta.hiccup/prepare-hiccup req render) h/html)))
+  ([page req] ;; FIXME: use adapter
+   (-> page #_(silta.hiccup/prepare-hiccup req render) h/html)))
 
 (defn- respond-html
   [html]

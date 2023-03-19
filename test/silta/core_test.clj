@@ -1,6 +1,8 @@
 (ns silta.core-test
   (:require [clojure.test :refer [deftest is testing]]
             [clojure.set :as set]
+            [clojure.walk]
+            [silta.test-utils :refer [mangle-attrs]]
             [silta.core :refer [defview make-routes]]
             [silta.hiccup :refer [sink? view?]]))
 
@@ -44,37 +46,57 @@
 (defn- get-endpoints [pages]
   (->> pages make-routes (map first) set))
 
+(defn- render
+  [view & params]
+  (->> (when (seq params) {:params (vec params)})
+       ((:renderer view))
+       mangle-attrs))
+
 ;; --- tests ---
+
+;; TODO: test for view body containing several forms, but only last should be hiccup
+
+;; TODO: tests with `on-click`, `on-blur`...
+
+;; TODO: test to check that invoking two views with same params should have both equivalent `silta-view-form` and `silta-view-id`
+;;       (same for `silta-sink-id`)
 
 (deftest test-defview
   (testing "with no parameters"
     (is (non-sink-view? va))
     (is (= "/va" (:endpoint va)))
-    (is (= [:div "Something here"]
-           ((:renderer va) nil))))
+    (is (= [:div {:silta-view-form "silta.core-test/va"}
+            "Something here"]
+           (render va))))
   (testing "with parameters, no nested views"
     (is (non-sink-view? vb))
     (is (= "/vb" (:endpoint vb)))
-    (is (= [:div
+    (is (= [:div {:silta-view-form "silta.core-test/vb"}
             [:span "x is 1"]
             [:span "y is 2"]]
-           ((:renderer vb) {:params [1 2]}))))
+           (render vb 1 2))))
   (testing "with full request map"
     (is (non-sink-view? vb*))
     (is (= "/vb*" (:endpoint vb*)))
-    (is (= [:div
+    (is (= [:div {:silta-view-form "silta.core-test/vb*"}
             [:span "x is 1"]
             [:span "y is 2"]]
-           ((:renderer vb*) {:params [1 2]}))))
-  ;; simply tests def'ing the sink, not actually any live updates
+           (render vb* 1 2))))
+    ;; simply tests def'ing the sink, not actually any live updates
   (testing "with `:sink`"
     (is (sink? vc))
     (is (= "/vc" (:endpoint vc)))
-    (is (= [:div
-            [va]
-            [vb 1 1]]
-           ((:renderer vc) {:params [1]})))))
+    (is (= [:div {:silta-view-form "silta.core-test/vc"}
+            [:div {:silta-view-form "silta.core-test/va"
+                   :silta-view-id "<id>"}
+             "Something here"]
+            [:div {:silta-view-form "silta.core-test/vb"
+                   :silta-view-id "<id>"}
+             [:span "x is 1"]
+             [:span "y is 1"]]]
+           (render vc 1)))))
 
+;; TODO: more comprehensive route tests
 (deftest test-make-routes
   (testing "with test page, should set up routes for all views + SSE route due to sink"
     (is (set/subset? #{"/" "/va" "/vb" "/vc"} (get-endpoints [["/" test-page]])))))
