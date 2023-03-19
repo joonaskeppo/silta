@@ -1,8 +1,7 @@
 (ns silta.adapter
   "Macro-based facilities to process and adapt hiccup for Silta consumption.
   Implementation heavily inspired by Hiccup's compiler."
-  (:require [clojure.string :as str]
-            [silta.hiccup :as sh]
+  (:require [silta.hiccup :as sh]
             [silta.sources :as sources]
             [silta.utils :refer [clj->json]]))
 
@@ -107,22 +106,13 @@
   (let [params (try-eval-params params)]
     (if (every? literal? params)
       (adapt-view-invocation elt params)
-      #_(let [elt (if (var? elt) (var-get elt) elt)
-            view-attrs (if (sh/sink? elt)
-                         {:silta-sink-id (sources/setup-sink! (into [elt] params))}
-                         {:silta-view-id (random-uuid)})
-            renderer (:renderer (if (var? elt) (var-get elt) elt))
-            h (process-any (renderer {:params (mapv sources/->value params)}))]
-        (sh/update-attrs h merge view-attrs))
-      (let [h-sym (symbol (gensym "h")) ;; not using auto-gensyms for testability
-            view-attrs-sym (symbol (gensym "view-attrs"))
-            elt-val (if (var? elt) `(var-get ~elt) elt)]
-        `(let [~view-attrs-sym ~(if (sh/sink? (if (var? elt) (var-get elt) elt))
-                                  {:silta-sink-id `(sources/setup-sink! ~(into [elt-val] params))}
-                                  {:silta-view-id (random-uuid)})
-               ~h-sym (adapt ((:renderer ~elt-val)
-                              {:params (mapv sources/->value ~params)}))]
-           (sh/update-attrs ~h-sym merge ~view-attrs-sym))))))
+      (let [elt-val (if (var? elt) `(var-get ~elt) elt)]
+        `(let [view-attrs# ~(if (sh/sink? (if (var? elt) (var-get elt) elt))
+                              {:silta-sink-id `(sources/setup-sink! ~(into [elt-val] params))}
+                              {:silta-view-id (random-uuid)})
+               h# (adapt ((:renderer ~elt-val)
+                          {:params (mapv sources/->value ~params)}))]
+           (sh/update-attrs h# merge view-attrs#))))))
 
 ;; NOTE:
 ;; simplifying assumption: every view/sink needs a top-level element
@@ -134,12 +124,10 @@
   [h]
   (if (literal-attrs? h)
     (-> h (sh/update-children process-any) (sh/update-attrs adapt-attrs))
-    (let [h (sh/update-children h process-any)
-          h-sym (symbol (gensym "h"))
-          new-attrs-sym (symbol (gensym "new-attrs"))]
-      `(let [~h-sym ~h
-             ~new-attrs-sym (adapt-attrs (sh/get-attrs ~h-sym))]
-         (sh/set-attrs ~h-sym ~new-attrs-sym)))))
+    (let [h (sh/update-children h process-any)]
+      `(let [h# ~h
+             new-attrs# (adapt-attrs (sh/get-attrs h#))]
+         (sh/set-attrs h# new-attrs#)))))
 
 (defn process-root-view-node
   "Process the root node of a view (incl. sink).
@@ -151,16 +139,13 @@
     (if sufficiently-processed
       (let [old-attrs (sh/get-attrs x)]
         (process-any (sh/set-attrs x (adapt-attrs (merge old-attrs new-attrs)))))
-      (let [h-sym (symbol (gensym "h"))
-            old-attrs-sym (symbol (gensym "old-attrs"))
-            new-attrs-sym (symbol (gensym "new-attrs"))]
-        `(let [~h-sym ~x
-               ~old-attrs-sym (sh/get-attrs ~h-sym)
-               ~new-attrs-sym ~new-attrs]
-           (->> (merge ~old-attrs-sym ~new-attrs-sym)
-                adapt-attrs
-                (sh/set-attrs ~h-sym)
-                adapt))))))
+      `(let [h# ~x
+             old-attrs# (sh/get-attrs h#)
+             new-attrs# ~new-attrs]
+         (->> (merge old-attrs# new-attrs#)
+              adapt-attrs
+              (sh/set-attrs h#)
+              adapt)))))
 
 ;; --- top-level handlers ---
 
