@@ -58,27 +58,27 @@
 
 ;; TODO: tests with `on-click`, `on-blur`...
 
-;; TODO: test to check that invoking two views with same params should have both equivalent `silta-view-form` and `silta-view-id`
+;; TODO: test to check that invoking two views with same params should have both equivalent `silta-view-name` and `silta-view-id`
 ;;       (same for `silta-sink-id`)
 
 (deftest test-defview
   (testing "with no parameters"
     (is (non-sink-view? va))
     (is (= "/va" (:endpoint va)))
-    (is (= [:div {:silta-view-form "silta.core-test/va"}
+    (is (= [:div {:silta-view-name "silta.core-test/va"}
             "Something here"]
            (render va))))
   (testing "with parameters, no nested views"
     (is (non-sink-view? vb))
     (is (= "/vb" (:endpoint vb)))
-    (is (= [:div {:silta-view-form "silta.core-test/vb"}
+    (is (= [:div {:silta-view-name "silta.core-test/vb"}
             [:span "x is 1"]
             [:span "y is 2"]]
            (render vb 1 2))))
   (testing "with full request map"
     (is (non-sink-view? vb*))
     (is (= "/vb*" (:endpoint vb*)))
-    (is (= [:div {:silta-view-form "silta.core-test/vb*"}
+    (is (= [:div {:silta-view-name "silta.core-test/vb*"}
             [:span "x is 1"]
             [:span "y is 2"]]
            (render vb* 1 2))))
@@ -86,11 +86,11 @@
   (testing "with `:sink`"
     (is (sink? vc))
     (is (= "/vc" (:endpoint vc)))
-    (is (= [:div {:silta-view-form "silta.core-test/vc"}
-            [:div {:silta-view-form "silta.core-test/va"
+    (is (= [:div {:silta-view-name "silta.core-test/vc"}
+            [:div {:silta-view-name "silta.core-test/va"
                    :silta-view-id "<id>"}
              "Something here"]
-            [:div {:silta-view-form "silta.core-test/vb"
+            [:div {:silta-view-name "silta.core-test/vb"
                    :silta-view-id "<id>"}
              [:span "x is 1"]
              [:span "y is 1"]]]

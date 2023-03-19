@@ -90,12 +90,16 @@
   [attrs]
   (adapt-events attrs))
 
+(defn make-view-id
+  [elt params]
+  (format "%s-%s" (get-in elt [:context :name]) (hash params)))
+
 (defn- adapt-view-invocation
   [elt params]
   (let [elt (if (var? elt) (var-get elt) elt)
         view-attrs (if (sh/sink? elt)
                      {:silta-sink-id (sources/setup-sink! (into [elt] params))}
-                     {:silta-view-id (random-uuid)})
+                     {:silta-view-id (make-view-id elt params)})
         renderer (:renderer elt)
         h (process-any (renderer {:params (mapv sources/->value params)}))]
     (sh/update-attrs h merge view-attrs)))
@@ -110,7 +114,7 @@
       (let [elt-val (if (var? elt) `(var-get ~elt) elt)]
         `(let [view-attrs# ~(if (sh/sink? (if (var? elt) (var-get elt) elt))
                               {:silta-sink-id `(sources/setup-sink! ~(into [elt-val] params))}
-                              {:silta-view-id (random-uuid)})
+                              {:silta-view-id `(make-view-id ~elt-val ~params)})
                h# (adapt ((:renderer ~elt-val)
                           {:params (mapv sources/->value ~params)}))]
            (sh/update-attrs h# merge view-attrs#))))))
@@ -136,7 +140,7 @@
   [form view-name]
   (let [x (process-any form) ;; might be as hiccup, might be as unevaluated form
         sufficiently-processed (and (vector? x) (every? literal? (take 2 x)))
-        new-attrs {:silta-view-form view-name}]
+        new-attrs {:silta-view-name view-name}]
     (if sufficiently-processed
       (let [old-attrs (sh/get-attrs x)]
         (process-any (sh/set-attrs x (adapt-attrs (merge old-attrs new-attrs)))))

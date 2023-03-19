@@ -41,9 +41,10 @@
   [{:keys [context body]
     {:keys [before after]} :props}]
   (let [view-name (:name context)
-        renderer-name (symbol (str "render-" view-name))
+        [_ unqualified-name] (str/split view-name #"/")
+        renderer-name (symbol (str "render-" unqualified-name))
         main-fn `(fn ~renderer-name ~(:arglist context)
-                   (silta.adapter/process {:view-name ~(format "%s/%s" *ns* view-name)} ~body))
+                   (silta.adapter/process {:view-name ~view-name} ~body))
         get-params (fn [req]
                      (or (some-> req :params :__params json->clj)
                          (:params req)
@@ -85,15 +86,16 @@
         metadata (update (meta vname) :doc #(or % docstring))
         endpoint (make-endpoint (assoc props :name vname))
         final-props (merge default-props props)
-        renderer (make-renderer {:context {:arglist arglist :name vname}
+        qualified-name (format "%s/%s" *ns* vname)
+        renderer (make-renderer {:context {:arglist arglist :name qualified-name}
                                  :props final-props
                                  :body body})]
     (assert (vector? arglist) (format "Missing arglist from view '%s'" vname))
     `(do
        (def ~(with-meta vname metadata)
          (silta.hiccup.View.
-          (merge ~(select-keys metadata [:sink])
-                 {:arglist '~arglist :name '~vname})
+          ~(merge (select-keys metadata [:sink])
+                 {:name qualified-name})
           ~endpoint
           ~final-props
           ~renderer))

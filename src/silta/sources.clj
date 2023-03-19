@@ -52,12 +52,16 @@
   [p]
   (if (source? p) (get-value p) p))
 
+(defn make-sink-id
+  [sink params]
+  (format "%s-%s" (get-in sink [:context :name]) (hash params)))
+
 (defn setup-sink!
   "Setup sink with provided params.
   Calls sink's renderer when any Sourceable param updates.
   Idempotent; not affected by additional calls due to re-renders."
   [[sink & params :as view+params]]
-  (let [sink-id (hash view+params)]
+  (let [sink-id (make-sink-id sink params)]
     (when-not (get @renderer-registry sink-id)
       (doseq [source (filter source? params)]
         (add-sink source sink-id (:renderer sink))
