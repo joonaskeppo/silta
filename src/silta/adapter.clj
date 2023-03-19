@@ -161,7 +161,7 @@
   "Returns hiccup with expanded view"
   [[elt :as h]]
   (if (silta.hiccup/view? elt)
-    (adapt (adapt-view-invocation h (rest h)))
+    (adapt (adapt-view-invocation elt (rest h)))
     h))
 
 (def with-adapted-hiccup
