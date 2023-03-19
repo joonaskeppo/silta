@@ -72,15 +72,16 @@
                                             (when-let [event-type (sh/as-event-type k)]
                                               [k event-type])))))
         events (->> (for [[k event-type] event-keys-and-types
-                          :let [event (get attrs k)
-                                last-idx (dec (count event))
-                                ?h (get event last-idx)
-                                [elt :as h] (when (vector? ?h) ?h)]]
-                      (if (and h (symbol? elt))
-                        (let [serialized-view (update h 0 :endpoint)]
-                          (assoc event last-idx serialized-view))
-                        ;; add event 
-                        [event-type event]))
+                          :let [events (get attrs k)]]
+                      [event-type (for [event events
+                                        :let [last-idx (dec (count event))
+                                              ?h (get event last-idx)
+                                              [elt :as h] (when (vector? ?h) ?h)]]
+                                    (if (and h (silta.hiccup/view? elt))
+                                      (let [serialized-view (update h 0 :endpoint)]
+                                        (assoc event last-idx serialized-view))
+                                      ;; add event 
+                                      [event-type event]))])
                     (into {}))]
     (cond-> (apply dissoc attrs (map first event-keys-and-types))
       (seq events) (assoc :silta-events (clj->json events)))))
@@ -171,19 +172,26 @@
   "Adapt hiccup into Silta-compatible form.
   Returns original form if unidentified."
   [x]
-  (cond
-    (silta.hiccup/hiccup+? x)
-    (silta.hiccup/edit-hiccup x with-adapted-hiccup)
+  (letfn [(resolve-value [x]
+            (cond
+              (var? x)    (var-get x)
+              (symbol? x) (try (var-get (resolve x)) (catch Exception _ x))
+              (vector? x) (mapv resolve-value x)
+              :else       x))]
+    (let [x (resolve-value x)]
+      (cond
+        (silta.hiccup/hiccup+? x)
+        (silta.hiccup/edit-hiccup x with-adapted-hiccup)
 
-    (and (seq? x) (every? silta.hiccup/hiccup+? x))
-    (map #(silta.hiccup/edit-hiccup % with-adapted-hiccup) x)
+        (and (seq? x) (every? silta.hiccup/hiccup+? x))
+        (map adapt x)
 
-    ;; only transform last item (could be body with side effects)
-    (seq? x)
-    (concat (butlast x) [(adapt (last x))])
+        ;; only transform last item (could be body with side effects)
+        (seq? x)
+        (concat (butlast x) [(adapt (last x))])
 
-    :else
-    x))
+        :else
+        x))))
 
 (defn- process-any
   "Process arbitrary forms and hiccup into compatible shape"

@@ -4,7 +4,8 @@
             [silta.test-utils :refer [mangle-attrs]]
             [silta.hiccup :as sh]
             [silta.core :refer [defview]]
-            [silta.adapter :refer [process adapt]]))
+            [silta.utils :refer [clj->json]]
+            [silta.adapter :refer [process adapt adapt-attrs]]))
 
 ;; --- helpers ---
 
@@ -22,7 +23,64 @@
 
 ;; --- tests ---
 
-;; TODO: test-adapt
+(deftest test-adapt-attrs
+  (testing "with nothing"
+    (is (empty? (adapt-attrs nil)))
+    (is (empty? (adapt-attrs {}))))
+  (testing "with ordinary attrs"
+    (let [attrs {:class "some-class" :id "my-id"}]
+      (is (= attrs (adapt-attrs attrs)))))
+  (testing "with `on-click`"
+    (is (= {:class "my-class unchanged"
+            :silta-events (clj->json {:click [[:swap {:target "some-target"} ["/va" "new"]]]})}
+           (adapt-attrs {:class "my-class unchanged"
+                         :on-click [[:swap {:target "some-target"} [va "new"]]]})))))
+
+(deftest test-adapt
+  (testing "with nothing"
+    (is (= nil (adapt nil))))
+  (testing "with ordinary hiccup"
+    (let [h [:span "hello"]]
+      (is (= h (adapt h))))
+    (let [h [:div
+             [:span "hello"]
+             [:div {:class "my-class"}
+              [:span "there"]]]]
+      (is (= h (adapt h)))))
+  (testing "with hiccup containing views"
+    (is (= [:div
+            [:div {:silta-view-form "silta.adapter-test/va"
+                   :silta-view-id "<id>"}
+             "got: hello"]
+            [:div {:silta-view-form "silta.adapter-test/vb"
+                   :silta-view-id "<id>"}
+             [:span 1 2]]]
+           (mangle-attrs
+            (adapt [:div
+                    [va "hello"]
+                    [vb 1 2]])))))
+  (testing "with seq of hiccup"
+    (let [hs `([:div [:span "what's"]]
+               [:div [:span "up"]])]
+      (is (= hs (adapt hs))))
+    (is (= `([:div [:span "first"]]
+             [:div
+              [:div {:silta-view-form "silta.adapter-test/va"
+                     :silta-view-id "<id>"}
+               "got: hello"]])
+           (mangle-attrs
+            (adapt `([:div [:span "first"]]
+                     [:div [va "hello"]]))))))
+  (testing "with seq of forms"
+    (is (= `((~'some-fn-call ~'x)
+             nil
+             [:div {:silta-view-form "silta.adapter-test/va"
+                    :silta-view-id "<id>"}
+              "got: hello, there"])
+           (mangle-attrs
+            (adapt `((~'some-fn-call ~'x)
+                     nil
+                     [va "hello, there"])))))))
 
 ;; TODO: (IMPORTANT) test that two invocations of same view yield identical attributes
 
@@ -32,6 +90,8 @@
            (process (let [x 1] ('fn-call x)))))))
 
 (deftest test-process
+  (testing "with nothing"
+    (is (= nil (process nil))))
   (testing "with fully evaluated views, default mode"
     (is (= [:div "got: stuff"]
            (process [:div "got: stuff"])))
