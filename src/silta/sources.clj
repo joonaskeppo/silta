@@ -1,6 +1,8 @@
 (ns silta.sources
   (:require [clojure.core.async :as a]))
 
+(def ^:dynamic *mock-view-ids* false)
+
 (defonce
   ^{:doc "Registry of mappings of sources to sinks.
     Used to facilitate the generation of new versions of source-based views."}
@@ -52,16 +54,18 @@
   [p]
   (if (source? p) (get-value p) p))
 
-(defn make-sink-id
-  [sink params]
-  (format "%s-%s" (get-in sink [:context :name]) (hash params)))
+(defn make-view-id
+  [elt params]
+  (if *mock-view-ids*
+    "<id>"
+    (format "%s-%s" (get-in elt [:context :name]) (hash params))))
 
 (defn setup-sink!
   "Setup sink with provided params.
   Calls sink's renderer when any Sourceable param updates.
   Idempotent; not affected by additional calls due to re-renders."
-  [[sink & params :as view+params]]
-  (let [sink-id (make-sink-id sink params)]
+  [sink params]
+  (let [sink-id (make-view-id sink params)]
     (when-not (get @renderer-registry sink-id)
       (doseq [source (filter source? params)]
         (add-sink source sink-id (:renderer sink))

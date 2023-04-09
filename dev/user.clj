@@ -6,7 +6,7 @@
             [reitit.ring :as ring]
             [aleph.http :as http]
             [manifold.stream]
-            [hiccup.core :refer [html]]
+            #_[hiccup.core :refer [html]]
             [clojure.core.async :as a]
             [clojure.tools.namespace.repl :as tn]
             [mount.core :as mount]))
@@ -104,8 +104,5 @@
   (reset))
 
 (comment
-  (require '[silta.core :refer [render]])
-  (sh/prepare-hiccup page)
-
   ;; update value, should be reflected in sink view
   (reset! +example-source+ "NEW VALUE"))

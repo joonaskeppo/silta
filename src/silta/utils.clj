@@ -37,3 +37,20 @@
   "Convert clj data into a JSON string using jsonista"
   j/write-value-as-string)
 
+(defmacro try-chain
+  "Executes `forms` sequentially, wrapped in try-catch blocks.
+  Returns first valid result."
+  [forms]
+  `(loop [fs# ~(mapv (fn [form] `(fn [] ~form)) forms)]
+     (when (seq fs#)
+       (let [result# (try
+                       ((first fs#))
+                       (catch Exception e# :silta.utils/exception))]
+         (if (not= :silta.utils/exception result#)
+           result#
+           (recur (rest fs#)))))))
+
+(comment
+  (try-chain [(require '[hiccup.core])
+              (require '[not-real.core])])
+  )

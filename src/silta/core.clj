@@ -3,13 +3,11 @@
             [silta.sse]
             [silta.utils :refer [map-vals]]
             [silta.adapter]
-            [hiccup.core :as h]
+            [silta.html]
             [reitit.ring.middleware.parameters :refer [parameters-middleware]]
             [jsonista.core :as j]
             [clojure.string :as str]
-            [clojure.java.io :as io]
-            [clojure.walk :as walk]
-            [clojure.set :as set]))
+            [clojure.java.io :as io]))
 
 (defonce
   ^{:doc "Registry of all view components.
@@ -38,24 +36,29 @@
 (defn- make-renderer
   "Create the renderer fn form, dependent on metadata.
   Tries to pre-process as much of `body` as possible."
-  [{:keys [context body]
+  [{:keys [body]
+    {:keys [view-name] :as context} :context
     {:keys [before after]} :props}]
-  (let [view-name (:name context)
-        [_ unqualified-name] (str/split view-name #"/")
+  (let [[_ unqualified-name] (str/split view-name #"/")
         renderer-name (symbol (str "render-" unqualified-name))
-        main-fn `(fn ~renderer-name ~(:arglist context)
-                   (silta.adapter/process {:view-name ~view-name} ~body))
-        get-params (fn [req]
-                     (or (some-> req :params :__params json->clj)
-                         (:params req)
-                         []))
-        apply-req (fn [renderer req]
-                    (if (vector? req)
-                      (apply renderer req)
-                      (renderer req)))
-        update-params (fn [req]
-                        (assoc req :params (get-params req)))]
-  `(comp ~after (partial ~apply-req ~main-fn) ~before ~update-params)))
+        process-opts (merge context {:view-name view-name
+                                     :view-sym (symbol unqualified-name)})
+        params-sym (symbol (gensym "params"))
+        main-fn `(fn ~renderer-name [~params-sym]
+                   (let [f# (fn ~(symbol (str "inner-" renderer-name))
+                              ~(:arglist context)
+                              (silta.adapter/process
+                                ~(assoc process-opts :params params-sym)
+                                ~body))]
+                     ;; For convenience (see: renderer arglist), apply if vectorized :params
+                     ;; (this may be a bad idea...)
+                     (if (vector? ~params-sym)
+                       (apply f# ~params-sym)
+                       (f# ~params-sym))))
+        update-params (fn [{:keys [params] :or {params []} :as req}]
+                        (assoc req :params (or (some-> params :__params json->clj)
+                                               params)))]
+    `(comp ~after ~main-fn ~before ~update-params)))
 
 (defn- get-view-arg
   [args pred predated-by]
@@ -87,7 +90,10 @@
         endpoint (make-endpoint (assoc props :name vname))
         final-props (merge default-props props)
         qualified-name (format "%s/%s" *ns* vname)
-        renderer (make-renderer {:context {:arglist arglist :name qualified-name}
+        renderer (make-renderer {:context {:arglist arglist
+                                           :no-html (boolean (:no-html metadata))
+                                           :sink (boolean (:sink metadata))
+                                           :view-name qualified-name}
                                  :props final-props
                                  :body body})]
     (assert (vector? arglist) (format "Missing arglist from view '%s'" vname))
@@ -95,7 +101,7 @@
        (def ~(with-meta vname metadata)
          (silta.hiccup.View.
           ~(merge (select-keys metadata [:sink])
-                 {:name qualified-name})
+                  {:name qualified-name})
           ~endpoint
           ~final-props
           ~renderer))
@@ -115,14 +121,6 @@
    (if sse
      (->> js-files vals (str/join "\n"))
      (->> js-files :base))))
-
-;; TODO: deprecate this in favor of wrapping view renderer's with
-;; `html` and `adapt`
-(defn- render
-  ([page]
-   (render page nil))
-  ([page req] ;; FIXME: use adapter
-   (-> page #_(silta.hiccup/prepare-hiccup req render) h/html)))
 
 (defn- respond-html
   [html]
@@ -144,7 +142,7 @@
   [[endpoint handler]]
   [endpoint {:get {:middleware [parameters-middleware
                                 coerce-params-middleware]
-                   :handler (comp respond-html render handler)}}])
+                   :handler (comp respond-html handler)}}])
 
 (defn- append-js
   "Adds script tag to hiccup page definition"

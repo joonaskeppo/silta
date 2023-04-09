@@ -2,8 +2,11 @@
   "Macro-based facilities to process and adapt hiccup for Silta consumption.
   Implementation heavily inspired by Hiccup's compiler."
   (:require [silta.hiccup :as sh]
+            [silta.html :refer [html]]
             [silta.sources :as sources]
             [silta.utils :refer [clj->json]]))
+
+(def ^:dynamic *compile-hiccup* true)
 
 (declare process-any adapt)
 
@@ -90,19 +93,11 @@
   [attrs]
   (adapt-events attrs))
 
-(defn make-view-id
-  [elt params]
-  (format "%s-%s" (get-in elt [:context :name]) (hash params)))
-
 (defn- adapt-view-invocation
   [elt params]
   (let [elt (if (var? elt) (var-get elt) elt)
-        view-attrs (if (sh/sink? elt)
-                     {:silta-sink-id (sources/setup-sink! (into [elt] params))}
-                     {:silta-view-id (make-view-id elt params)})
-        renderer (:renderer elt)
-        h (process-any (renderer {:params (mapv sources/->value params)}))]
-    (sh/update-attrs h merge view-attrs)))
+        renderer (:renderer elt)]
+    (process-any (renderer {:params (mapv sources/->value params)}))))
 
 ;; this will only handle the invocation from a parent view
 ;; attaching attributes and setting things up is handled elsewhere
@@ -112,12 +107,8 @@
     (if (every? literal? params)
       (adapt-view-invocation elt params)
       (let [elt-val (if (var? elt) `(var-get ~elt) elt)]
-        `(let [view-attrs# ~(if (sh/sink? (if (var? elt) (var-get elt) elt))
-                              {:silta-sink-id `(sources/setup-sink! ~(into [elt-val] params))}
-                              {:silta-view-id `(make-view-id ~elt-val ~params)})
-               h# (adapt ((:renderer ~elt-val)
-                          {:params (mapv sources/->value ~params)}))]
-           (sh/update-attrs h# merge view-attrs#))))))
+        `(adapt ((:renderer ~elt-val)
+                 {:params (mapv sources/->value ~params)}))))))
 
 ;; NOTE:
 ;; simplifying assumption: every view/sink needs a top-level element
@@ -137,14 +128,20 @@
 (defn process-root-view-node
   "Process the root node of a view (incl. sink).
   Adds attributes common to every invocation of view."
-  [form view-name]
-  (let [x (process-any form) ;; might be as hiccup, might be as unevaluated form
-        sufficiently-processed (and (vector? x) (every? literal? (take 2 x)))
-        new-attrs {:silta-view-name view-name}]
-    (if sufficiently-processed
-      (let [old-attrs (sh/get-attrs x)]
-        (process-any (sh/set-attrs x (adapt-attrs (merge old-attrs new-attrs)))))
-      `(let [h# ~x
+  [{:keys [view-name view-sym params sink]} form]
+  (let [form* (process-any form)
+        attrs-necessarily-constant (and (vector? form*) (every? literal? (take 2 form*)))
+        new-attrs (merge {:silta-view-name view-name}
+                         (if sink
+                           {:silta-sink-id `(sources/setup-sink! ~view-sym ~params)}
+                           {:silta-view-id `(sources/make-view-id ~view-sym ~params)}))]
+    (if attrs-necessarily-constant
+      (let [old-attrs (sh/get-attrs form*)]
+        (->> (merge old-attrs new-attrs)
+             adapt-attrs
+             (sh/set-attrs form*)
+             process-any))
+      `(let [h# ~form*
              old-attrs# (sh/get-attrs h#)
              new-attrs# ~new-attrs]
          (->> (merge old-attrs# new-attrs#)
@@ -172,9 +169,7 @@
 (def with-adapted-hiccup
   (comp with-expanded-views with-adapted-attrs))
 
-(defn adapt
-  "Adapt hiccup into Silta-compatible form.
-  Returns original form if unidentified."
+(defn- adapt*
   [x]
   (letfn [(resolve-value [x]
             (cond
@@ -196,6 +191,16 @@
 
         :else
         x))))
+
+(defn adapt
+  "Adapt hiccup into Silta-compatible form.
+  Returns compiled HTML string if `*compile-hiccup*` is true."
+  [x]
+  (let [adapted (adapt* x)]
+    (tap> [:adapt *compile-hiccup*])
+    (if (or (not *compile-hiccup*) (string? adapted))
+      adapted
+      (html adapted))))
 
 (defn- process-any
   "Process arbitrary forms and hiccup into compatible shape"
@@ -237,14 +242,20 @@
       x)))
 
 (defmacro process
-  "Transform view render fn body into a usable form.
-  Will defer any uninferred or leftover forms to runtime.
-  `mode` must be one of `:default`, `:sink`, or `:view`."
+  "Transform view render fn body.
+  When wrapped inside fn, returns HTML string at runtime, if `*compile-hiccup*` is true.
+  If `*compile-hiccup*` is false, returns (form transformable into) Hiccup.
+  Defers uninferred or leftover forms to runtime."
   [& args]
   (assert (#{1 2} (count args)) "Must provide 1 or 2 args to `process`")
-  (let [{:keys [view-name] :as opts} (when (map? (first args)) (first args))
+  (let [opts (when (map? (first args)) (first args))
         form (if opts (second args) (first args))]
-    (if view-name
-      (process-root-view-node form view-name)
-      (process-any form))))
+    (binding [*compile-hiccup* (not (:no-html opts))]
+      (tap> [:process *compile-hiccup*])
+      (let [processed-hiccup (if (:view-sym opts)
+                               (process-root-view-node opts form)
+                               (process-any form))]
+        (if *compile-hiccup*
+          `(html ~processed-hiccup)
+          processed-hiccup)))))
 
