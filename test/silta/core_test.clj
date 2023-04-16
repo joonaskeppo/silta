@@ -60,14 +60,12 @@
 
 ;; TODO: tests with `on-click`, `on-blur`...
 
-;; TODO: test to check that invoking two views with same params should have both equivalent `silta-view-name` and `silta-view-id`
-;;       (same for `silta-sink-id`)
-
 (deftest test-defview
   (testing "with no parameters"
     (is (non-sink-view? va))
     (is (= "/va" (:endpoint va)))
     (is (= [:div {:silta-view-name "silta.core-test/va"
+                  :silta-view-type "view"
                   :silta-view-id "<id>"}
             "Something here"]
            (render va))))
@@ -75,6 +73,7 @@
     (is (non-sink-view? vb))
     (is (= "/vb" (:endpoint vb)))
     (is (= [:div {:silta-view-name "silta.core-test/vb"
+                  :silta-view-type "view"
                   :silta-view-id "<id>"}
             [:span "x is 1"]
             [:span "y is 2"]]
@@ -83,6 +82,7 @@
     (is (non-sink-view? vb*))
     (is (= "/vb*" (:endpoint vb*)))
     (is (= [:div {:silta-view-name "silta.core-test/vb*"
+                  :silta-view-type "view"
                   :silta-view-id "<id>"}
             [:span "x is 1"]
             [:span "y is 2"]]
@@ -92,11 +92,14 @@
     (is (sink? vc))
     (is (= "/vc" (:endpoint vc)))
     (is (= [:div {:silta-view-name "silta.core-test/vc"
-                  :silta-sink-id "<id>"}
+                  :silta-view-type "sink"
+                  :silta-view-id "<id>"}
             [:div {:silta-view-name "silta.core-test/va"
+                   :silta-view-type "view"
                    :silta-view-id "<id>"}
              "Something here"]
             [:div {:silta-view-name "silta.core-test/vb"
+                   :silta-view-type "view"
                    :silta-view-id "<id>"}
              [:span "x is 1"]
              [:span "y is 1"]]]

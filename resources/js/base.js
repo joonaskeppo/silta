@@ -1,36 +1,38 @@
 // ---- base ---
 
-const eventsAttr = 'silta-events';
-const eventsSelector = '[' + eventsAttr + ']';
+// Silta-specific HTML element attributes
+const specialAttrs = {
+    events: 'silta-events',
+    viewId: 'silta-view-id',
+    viewName: 'silta-view-name',
+    viewType: 'silta-view-type'
+}
+
+const eventsSelector =  '[' + specialAttrs.events + ']';
 
 const clientId = self.crypto.randomUUID();
 
-function findElementsWithEventsUnderNode(node) {
-    let entries = [];
+// event handlers are provided as `silta-events` (map of 2d arrays)
+function findElementsWithEvents(nodes) {
+    return nodes.reduce((acc, node) => {
+        if (node.hasAttribute(specialAttrs.events)) {
+            acc.push(node);
+        }
 
-    if (node.hasAttribute(eventsAttr)) {
-        entries.push(node);
-    }
+        node.querySelectorAll(eventsSelector).forEach((elt) => {
+            acc.push(elt);
+        });
 
-    node.querySelectorAll(eventsSelector).forEach((elt) => {
-        entries.push(elt);
-    });
-
-    return entries;
+        return acc;
+    }, []);
 }
 
-// event handlers are provided as `silta-events`
-// as map of 2d arrays
-function findElementsWithEvents(rootNodeOrSelector) {
-    if (rootNodeOrSelector instanceof HTMLElement) {
-        return findElementsWithEventsUnderNode(rootNodeOrSelector);
-    }
-
-    let entries = [];
-    document.querySelectorAll(rootNodeOrSelector).forEach((rootNodeOrSelector) => {
-        entries = entries.concat(findElementsWithEventsUnderNode(rootNodeOrSelector));
-    });
-    return entries;
+// return array of nodes matching `nodeOrSelector`.
+// returns array containing only `nodeOrSelector` if HTMLElement.
+function resolveNodes(nodeOrSelector) {
+    return (nodeOrSelector instanceof HTMLElement) ?
+        [nodeOrSelector] :
+        Array.from(document.querySelectorAll(nodeOrSelector));
 }
 
 function makeQueryString(params) {
@@ -41,49 +43,62 @@ function makeRequestUrl(endpoint, params) {
     return endpoint + makeQueryString({"__params": JSON.stringify(params)});
 }
 
-function setupEventHandlers(rootNodeOrSelector) {
-    findElementsWithEvents(rootNodeOrSelector).forEach((node) => {
-        try {
-            const events = JSON.parse(node.getAttribute(eventsAttr));
-            Object.keys(events).forEach((eventType) => {
-                let callbacks = [];
+function setupEventHandlers(nodes) {
+    nodes.forEach((node) => {
+        const unparsedEvents = node.getAttribute(specialAttrs.events);
+        if (!unparsedEvents) {
+            console.log("No events for node, skipping:", node)
+        }
+        if (unparsedEvents) {
+            try {
+                const events = JSON.parse(unparsedEvents);
+                const viewId = node.getAttribute(specialAttrs.viewId);
 
-                events[eventType].forEach((descriptor) => {
-                    const type = descriptor[0];
-                    const eventConfig = descriptor[1] instanceof Array ? undefined : descriptor[1];
-                    const responseHandler = {
-                        fn: handleUpdate(elementUpdates[type]),
-                        // TODO: ensure that node always has id attribute! (when dynamic)
-                        args: [(eventConfig && eventConfig.target) ? eventConfig.target : '#' + node.id]
-                    };
-                    const endpointWithParams = descriptor[descriptor.length - 1];
-                    const requestConfig = {
-                        method: 'GET',
-                        url: makeRequestUrl(endpointWithParams[0], endpointWithParams.slice(1))
-                    };
+                Object.keys(events).forEach((eventType) => {
+                    let callbacks = [];
 
-                    console.log(`Adding '${eventType}' type listener for node:`, node);
-                    console.log(`Initializing '${type}' action:`, eventConfig, requestConfig, responseHandler);
+                    events[eventType].forEach((descriptor) => {
+                        const type = descriptor[0];
+                        const eventConfig = descriptor[1] instanceof Array ? undefined : descriptor[1];
+                        const target = (eventConfig && eventConfig.target) ?
+                            eventConfig.target :
+                            viewId ? `[silta-view-id="${viewId}"]` : undefined;
+                        const responseHandler = {
+                            fn: handleUpdate(elementUpdates[type]),
+                            args: [target]
+                        };
+                        const endpointWithParams = descriptor[descriptor.length - 1];
+                        const requestConfig = {
+                            method: 'GET',
+                            url: makeRequestUrl(endpointWithParams[0], endpointWithParams.slice(1))
+                        };
 
-                    callbacks.push(() => handleAjaxRequest(requestConfig, responseHandler));
+                        if (!target) {
+                            console.error('Failed to setup event handler for node using config:', node, eventConfig);
+                        }
+
+                        console.log(`Adding '${eventType}' type listener for node:`, node);
+                        console.log(`Initializing '${type}' action:`, eventConfig, requestConfig, responseHandler);
+
+                        callbacks.push(() => handleAjaxRequest(requestConfig, responseHandler));
+                    });
+
+                    // attach all callbacks to single event listener of given type
+                    node.addEventListener(eventType, () => {
+                        console.log(`Calling ${callbacks.length} '${eventType}' callbacks for node:`, node);
+                        callbacks.forEach((cb) => cb());
+                    });
                 });
-
-                // attach all callbacks to single event listener of given type
-                node.addEventListener(eventType, () => {
-                    console.log(`Calling ${callbacks.length} '${eventType}' callbacks for node:`, node);
-                    callbacks.forEach((cb) => cb());
-                });
-            });
-        } catch (error) {
-            console.error("Failed to parse events for node:", node);
-            console.error(error);
+            } catch (error) {
+                console.error("Failed to parse events for node:", node);
+                console.error(error);
+            }
         }
     });
 }
 
 function handleAjaxRequest(req, props) {
     let xhr = new XMLHttpRequest();
-
 
     // response handling
     xhr.onreadystatechange = function() {
@@ -135,11 +150,11 @@ function handleUpdate(updateConfig) {
 
                 // refresh event handlers
                 console.log("Refreshing event handlers for:", nodes);
-                nodes.forEach((node) => setupEventHandlers(node));
+                setupEventHandlers(nodes);
             })
         }
     }
 }
 
 // Initialize with root-most node, <body>
-setupEventHandlers('body');
+setupEventHandlers(findElementsWithEvents(resolveNodes('body')));

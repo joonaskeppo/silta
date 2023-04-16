@@ -4,6 +4,7 @@
             [silta.utils :refer [map-vals]]
             [silta.adapter]
             [silta.html]
+            [silta.sources :as sources]
             [reitit.ring.middleware.parameters :refer [parameters-middleware]]
             [jsonista.core :as j]
             [clojure.string :as str]
@@ -37,24 +38,29 @@
   "Create the renderer fn form, dependent on metadata.
   Tries to pre-process as much of `body` as possible."
   [{:keys [body]
-    {:keys [view-name] :as context} :context
+    {:keys [view-name view-sym sink] :as context} :context
     {:keys [before after]} :props}]
   (let [[_ unqualified-name] (str/split view-name #"/")
+        view-sym (symbol unqualified-name)
         renderer-name (symbol (str "render-" unqualified-name))
         process-opts (merge context {:view-name view-name
-                                     :view-sym (symbol unqualified-name)})
+                                     :view-sym view-sym})
         params-sym (symbol (gensym "params"))
         main-fn `(fn ~renderer-name [~params-sym]
                    (let [f# (fn ~(symbol (str "inner-" renderer-name))
                               ~(:arglist context)
                               (silta.adapter/process
-                                ~(assoc process-opts :params params-sym)
+                                ~(assoc process-opts
+                                        :params params-sym ;; TODO: unnecessary?
+                                        :view-id (if sink
+                                                   `(sources/setup-sink! ~view-sym ~params-sym)
+                                                   `(sources/make-view-id ~view-sym ~params-sym)))
                                 ~body))]
                      ;; For convenience (see: renderer arglist), apply if vectorized :params
                      ;; (this may be a bad idea...)
                      (if (vector? ~params-sym)
-                       (apply f# ~params-sym)
-                       (f# ~params-sym))))
+                       (->> ~params-sym (map sources/->value) (apply f#))
+                       (->> ~params-sym sources/->value f#))))
         update-params (fn [{:keys [params] :or {params []} :as req}]
                         (assoc req :params (or (some-> params :__params json->clj)
                                                params)))]
@@ -71,7 +77,7 @@
    :after identity})
 
 (defmacro defview
-  "Create a view component
+  "Create a view component.
   Invoked similarly to `defn`.
 
   Metadata may be provided that alters how the view is used.
@@ -163,6 +169,13 @@
   {:append-client-js true
    :sse (get-default-sse-setting)})
 
+(defn coerce-page
+  "Ensure page is stringified HTML"
+  [page]
+  (if (string? page)
+    page
+    (silta.adapter/adapt page)))
+
 ;; TODO: we should also handle page-specific opts to disable/enable SSE, etc.
 ;; (however, `make-routes` should work more or less as-is; more to do with JS side...)
 (defn make-routes
@@ -174,11 +187,13 @@
                                  (let [page (last rem)
                                        opts (if (map? (first rem))
                                               (merge default-page-opts (first rem))
-                                              default-page-opts)]
-                                   [endpoint (constantly
-                                              (if (:append-client-js opts)
-                                                (append-js opts page)
-                                                page))]))))
+                                              default-page-opts)
+                                       renderer (constantly
+                                                  (coerce-page
+                                                    (if (:append-client-js opts)
+                                                      (append-js opts page)
+                                                      page)))]
+                                   [endpoint renderer]))))
         view-routes (->> @view-registry
                          (mapv (fn [[endpoint view]]
                                  [endpoint (:renderer view)])))]

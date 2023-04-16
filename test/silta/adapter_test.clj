@@ -57,10 +57,12 @@
     (testing "with hiccup containing views"
       (is (= [:div
               [:div {:silta-view-name "silta.adapter-test/va"
+                     :silta-view-type "view"
                      :silta-view-id "<id>"}
                "got: hello"]
               [:div {:id "vb-root"
                      :silta-view-name "silta.adapter-test/vb"
+                     :silta-view-type "view"
                      :silta-view-id "<id>"}
                [:span 1 2]
                [:button {:class "btn btn-style"
@@ -77,6 +79,7 @@
       (is (= `([:div [:span "first"]]
                [:div
                 [:div {:silta-view-name "silta.adapter-test/va"
+                       :silta-view-type "view"
                        :silta-view-id "<id>"}
                  "got: hello"]])
              (adapt `([:div [:span "first"]]
@@ -86,6 +89,7 @@
         (is (= `((test-fn ~'x)
                  nil
                  [:div {:silta-view-name "silta.adapter-test/va"
+                        :silta-view-type "view"
                         :silta-view-id "<id>"}
                   "got: hello, there"])
                (adapt `((test-fn ~'x)
@@ -107,6 +111,7 @@
     (is (= [:div {:top "div"}
             [:div {:id "vb-root"
                    :silta-view-name "silta.adapter-test/vb"
+                   :silta-view-type "view"
                    :silta-view-id "<id>"}
              [:span "hello" "there"]
              [:button {:class "btn btn-style"
@@ -118,22 +123,26 @@
     (is (= [:div
             [:div
              {:silta-view-name "silta.adapter-test/va"
+              :silta-view-type "view"
               :silta-view-id "<id>"}
              "got: stuff"]
             [:div
              {:silta-view-name "silta.adapter-test/va"
+              :silta-view-type "view"
               :silta-view-id "<id>"}
              "got: and more"]]
            (-process [:div
                       [va "stuff"]
                       [va "and more"]])))
     (is (= [:div
-            [:span {:silta-sink-id "<id>"
+            [:span {:silta-view-id "<id>"
+                    :silta-view-type "sink"
                     :silta-view-name "silta.adapter-test/vsink"}
              100]]
            (-process [:div [vsink 100]]))))
   (testing "with fully evaluated views, view mode"
     (is (= [:div {:silta-view-name "my-view"
+                  :silta-view-type "view"
                   :silta-view-id "<id>"}
             [:span "hello, there"]]
            (-process {:view-sym 'my-view

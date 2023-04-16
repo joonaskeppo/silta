@@ -65,10 +65,14 @@
   Calls sink's renderer when any Sourceable param updates.
   Idempotent; not affected by additional calls due to re-renders."
   [sink params]
-  (let [sink-id (make-view-id sink params)]
+  (let [params (vec params)
+        sink-id (make-view-id sink params)]
+    (tap> [:setup-sink {:params params :sink-id sink-id }])
     (when-not (get @renderer-registry sink-id)
-      (doseq [source (filter source? params)]
-        (add-sink source sink-id (:renderer sink))
+      (doseq [source (filter source? params)
+              :let [renderer (fn [] ((:renderer sink) {:params params}))]]
+        (tap> [:setup-sink/new-sink {:sink sink :source source}])
+        (add-sink source sink-id renderer)
         (connect! source trigger-update!)))
     sink-id))
 

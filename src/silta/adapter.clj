@@ -60,7 +60,7 @@
   (mapv (fn [x]
           (if (symbol? x)
             (try
-              (sources/->value (eval x))
+              (eval x)
               (catch Exception _ x))
             x))
         params))
@@ -97,7 +97,7 @@
   [elt params]
   (let [elt (if (var? elt) (var-get elt) elt)
         renderer (:renderer elt)]
-    (process-any (renderer {:params (mapv sources/->value params)}))))
+    (process-any (renderer {:params (vec params) #_(mapv sources/->value params)}))))
 
 ;; this will only handle the invocation from a parent view
 ;; attaching attributes and setting things up is handled elsewhere
@@ -108,7 +108,7 @@
       (adapt-view-invocation elt params)
       (let [elt-val (if (var? elt) `(var-get ~elt) elt)]
         `(adapt ((:renderer ~elt-val)
-                 {:params (mapv sources/->value ~params)}))))))
+                 {:params ~(vec params) #_(mapv sources/->value ~params)}))))))
 
 ;; NOTE:
 ;; simplifying assumption: every view/sink needs a top-level element
@@ -128,13 +128,12 @@
 (defn process-root-view-node
   "Process the root node of a view (incl. sink).
   Adds attributes common to every invocation of view."
-  [{:keys [view-name view-sym params sink]} form]
+  [{:keys [view-name view-sym view-id sink]} form]
   (let [form* (process-any form)
         attrs-necessarily-constant (and (vector? form*) (every? literal? (take 2 form*)))
-        new-attrs (merge {:silta-view-name view-name}
-                         (if sink
-                           {:silta-sink-id `(sources/setup-sink! ~view-sym ~params)}
-                           {:silta-view-id `(sources/make-view-id ~view-sym ~params)}))]
+        new-attrs {:silta-view-name view-name
+                   :silta-view-type (if sink "sink" "view")
+                   :silta-view-id view-id}]
     (if attrs-necessarily-constant
       (let [old-attrs (sh/get-attrs form*)]
         (->> (merge old-attrs new-attrs)
@@ -197,7 +196,6 @@
   Returns compiled HTML string if `*compile-hiccup*` is true."
   [x]
   (let [adapted (adapt* x)]
-    (tap> [:adapt *compile-hiccup*])
     (if (or (not *compile-hiccup*) (string? adapted))
       adapted
       (html adapted))))
@@ -251,7 +249,6 @@
   (let [opts (when (map? (first args)) (first args))
         form (if opts (second args) (first args))]
     (binding [*compile-hiccup* (not (:no-html opts))]
-      (tap> [:process *compile-hiccup*])
       (let [processed-hiccup (if (:view-sym opts)
                                (process-root-view-node opts form)
                                (process-any form))]
