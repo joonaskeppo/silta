@@ -34,11 +34,8 @@
 
 ;; --- fixures ---
 
-(defn- headless? []
-  (= "1" (System/getenv "HEADLESS_MODE")))
-
 (defn headless-mode [f]
-  (w/with-page (w/make-page {:headless (headless?)})
+  (w/with-page (w/make-page {:headless true})
     (f)))
 
 (defn wrap-app [f]
