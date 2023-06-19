@@ -43,44 +43,65 @@ function makeRequestUrl(endpoint, params) {
     return endpoint + makeQueryString({"__params": JSON.stringify(params)});
 }
 
+function parseEvent(event, viewId) {
+    const thisViewSelector = `[silta-view-id="${viewId}"]`;
+    const withoutConfig = Array.isArray(event[1]);
+    let type, config, endpoint;
+
+    type = event[0];
+
+    config = withoutConfig ?
+        { target: viewId ? thisViewSelector : undefined } :
+        {
+            ... event[1],
+            target: event[1].target ?
+                event[1].target :
+                (viewId ? thisViewSelector : undefined)
+        };
+
+    endpoint = withoutConfig ? event[1] : event[2];
+    endpoint = endpoint &&
+        {
+            method: 'GET',
+            url: makeRequestUrl(endpoint[0], endpoint.slice(1))
+        };
+
+    return { type, config, endpoint };
+}
+
 function setupEventHandlers(nodes) {
     nodes.forEach((node) => {
-        const unparsedEvents = node.getAttribute(specialAttrs.events);
-        if (!unparsedEvents) {
+        const stringifiedEvents = node.getAttribute(specialAttrs.events);
+        if (!stringifiedEvents) {
             console.log("No events for node, skipping:", node)
         }
-        if (unparsedEvents) {
+        if (stringifiedEvents) {
             try {
-                const events = JSON.parse(unparsedEvents);
+                const events = JSON.parse(stringifiedEvents);
                 const viewId = node.getAttribute(specialAttrs.viewId);
 
                 Object.keys(events).forEach((eventType) => {
                     let callbacks = [];
 
-                    events[eventType].forEach((descriptor) => {
-                        const type = descriptor[0];
-                        const eventConfig = descriptor[1] instanceof Array ? undefined : descriptor[1];
-                        const target = (eventConfig && eventConfig.target) ?
-                            eventConfig.target :
-                            viewId ? `[silta-view-id="${viewId}"]` : undefined;
-                        const responseHandler = {
-                            fn: handleUpdate(elementUpdates[type]),
-                            args: [target]
-                        };
-                        const endpointWithParams = descriptor[descriptor.length - 1];
-                        const requestConfig = {
-                            method: 'GET',
-                            url: makeRequestUrl(endpointWithParams[0], endpointWithParams.slice(1))
-                        };
+                    events[eventType].forEach((event) => {
+                        const { type, config, endpoint } = parseEvent(event, viewId);
 
-                        if (!target) {
-                            console.error('Failed to setup event handler for node using config:', node, eventConfig);
+                        if (config && !config.target) {
+                            console.error('Failed to setup event -- could not infer target:', { node, descriptor, config });
                         }
 
                         console.log(`Adding '${eventType}' type listener for node:`, node);
-                        console.log(`Initializing '${type}' action:`, eventConfig, requestConfig, responseHandler);
 
-                        callbacks.push(() => handleAjaxRequest(requestConfig, responseHandler));
+                        if (!endpoint) {
+                            // descriptor does not contain 'endpoint' description -> `null` resultant HTML
+                            callbacks.push(() => handleUpdate(type, config)(null));
+                        } else {
+                            const handler = handleUpdate(type, config);
+
+                            console.log(`Initializing '${type}' action with endpoint:`, config, endpoint, handler);
+
+                            callbacks.push(() => handleAjaxRequest(endpoint, handler));
+                        }
                     });
 
                     // attach all callbacks to single event listener of given type
@@ -97,13 +118,13 @@ function setupEventHandlers(nodes) {
     });
 }
 
-function handleAjaxRequest(req, props) {
+function handleAjaxRequest(req, handler) {
     let xhr = new XMLHttpRequest();
 
     // response handling
     xhr.onreadystatechange = function() {
         if (xhr.readyState === XMLHttpRequest.DONE && xhr.status === 200) {
-            props.fn.apply(null, props.args)(xhr.responseText);
+            handler(xhr.responseText);
         }
     }
     // send request
@@ -114,45 +135,50 @@ function handleAjaxRequest(req, props) {
 
 // --- handlers ---
 
-// TODO: ensure that selector is always available (and unique when target is 'this')
-
-const elementUpdates = {
-    swap: { handler: (target, newNode) => target.replaceWith(newNode) },
-    append: { handler: (target, newNode) => target.append(newNode) },
-    prepend: { handler: (target, newNode) => target.prepend(newNode) },
-    remove: { noElementCreation: true, skipEventHandlerRefresh: true, handler:(target) => target.remove() } 
+const createElement = (html) => {
+    let newElt = document.createElement('div');
+    newElt.innerHTML = html;
+    return newElt.firstChild;
 }
 
-function handleUpdate(updateConfig) {
-    return function(selector) {
-        return function(html) {
-            let nodes = [];
+const elementUpdates = {
+    swap: (html, elt) => {
+        const newElt = createElement(html);
+        elt.replaceWith(newElt);
+        return [newElt];
+    },
+    append: (html, elt) => {
+        const newElt = createElement(html);
+        elt.append(newElt);
+        return [newElt];
+    },
+    prepend: (html, elt) => {
+        const newElt = createElement(html);
+        elt.prepend(newElt);
+        return [newElt];
+    },
+    remove: (_, elt) => {
+        elt.remove();
+        return [];
+    }
+}
 
-            document.querySelectorAll(selector).forEach((elt) => {
-                let newElt;
-                if (!updateConfig.noElementCreation) {
-                    // create new temp node, will be pushed to `nodes`
-                    newElt = document.createElement('div');
-                    newElt.innerHTML = html;
-                    newElt = newElt.firstChild;
+function handleUpdate(type, { target }) {
+    const updateFn = elementUpdates[type];
 
-                    // do update
-                    updateConfig.handler(elt, newElt);
-                } else {
-                    // no new element to create, so just call handler
-                    updateConfig.handler(elt);
-                }
+    return function(html) {
+        let nodes = [];
+        let createdNodes = [];
 
-                // for `delete`, we don't want to refresh our event handlers
-                if (!updateConfig.skipEventHandlerRefresh) {
-                    nodes.push(newElt || elt);
-                }
+        // invoke handler for each DOM element matching `selector`
+        document.querySelectorAll(target).forEach((elt) => {
+            nodes = updateFn(html, elt);
+            createdNodes = createdNodes.concat(nodes);
+        })
 
-                // refresh event handlers
-                console.log("Refreshing event handlers for:", nodes);
-                setupEventHandlers(nodes);
-            })
-        }
+        // refresh event handlers
+        console.log("Refreshing event handlers for:", createdNodes);
+        setupEventHandlers(createdNodes);
     }
 }
 

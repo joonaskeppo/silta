@@ -34,11 +34,17 @@
     (sequential? v) (mapv json->clj v)
     :else           v))
 
+(defn process-result
+  [result no-html]
+  (if (and (not no-html) (silta.adapter/compile-hiccup? result))
+    (silta.html/html result)
+    result))
+
 (defn- make-renderer
   "Create the renderer fn form, dependent on metadata.
   Tries to pre-process as much of `body` as possible."
   [{:keys [body]
-    {:keys [view-name view-sym sink] :as context} :context
+    {:keys [view-name view-sym sink no-html] :as context} :context
     {:keys [before after]} :props}]
   (let [[_ unqualified-name] (str/split view-name #"/")
         view-sym (symbol unqualified-name)
@@ -56,14 +62,27 @@
                                                    `(sources/setup-sink! ~view-sym ~params-sym)
                                                    `(sources/make-view-id ~view-sym ~params-sym)))
                                 ~body))]
-                     ;; For convenience (see: renderer arglist), apply if vectorized :params
-                     ;; (this may be a bad idea...)
-                     (if (vector? ~params-sym)
-                       (->> ~params-sym (map sources/->value) (apply f#))
-                       (->> ~params-sym sources/->value f#))))
+                     ;; For convenience (see `:before` fn), can either be a seq of params, or req map
+                     ;; (TODO: redundant? see `update-params`)
+                     (cond
+                       (sequential? ~params-sym)
+                       (let [result# (->> ~params-sym silta.adapter/extract-values (apply f#))]
+                         (process-result result# ~no-html))
+
+                       (map? ~params-sym)
+                       (let [result# (-> ~params-sym (update :params silta.adapter/extract-values) f#)]
+                         (process-result result# ~no-html))
+
+                       :else
+                       (throw (ex-info "Failed to render view. Args must be as a map or a sequential."
+                                       {:view '~(symbol view-name)
+                                        :args ~params-sym})))))
         update-params (fn [{:keys [params] :or {params []} :as req}]
-                        (assoc req :params (or (some-> params :__params json->clj)
-                                               params)))]
+                        (let [params (or (some-> params :__params json->clj) params)
+                              params (if (or (sequential? params) (set? params))
+                                       (vec params)
+                                       (vector params))]
+                          (assoc req :params params)))]
     `(comp ~after ~main-fn ~before ~update-params)))
 
 (defn- get-view-arg
@@ -174,7 +193,8 @@
   [page]
   (if (string? page)
     page
-    (silta.adapter/adapt page)))
+    (silta.html/html
+      (silta.adapter/adapt page))))
 
 ;; TODO: we should also handle page-specific opts to disable/enable SSE, etc.
 ;; (however, `make-routes` should work more or less as-is; more to do with JS side...)
@@ -200,7 +220,3 @@
     (->> (into page-routes view-routes)
          (mapv make-route)
          (into live-routes))))
-
-;; TODO:
-;; - a let-like form (e.g., `let-views`) for small, one-off views (that still require routing, obv)
-;; - `view` and `sink` macros (may be redundant to have `let-views`..?)

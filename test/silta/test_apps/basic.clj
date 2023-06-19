@@ -1,4 +1,5 @@
-(ns user
+(ns silta.test-apps.basic
+  "A super simple button clicker app"
   (:require [silta.core :refer [defview make-routes]]
             [silta.hiccup :as sh]
             [silta.sources :as ss]
@@ -7,7 +8,6 @@
             [aleph.http :as http]
             [manifold.stream]
             [clojure.core.async :as a]
-            [clojure.tools.namespace.repl :as tn]
             [mount.core :as mount]))
 
 (defview intro-text []
@@ -75,42 +75,3 @@
 
 (comment
   ((:renderer button) {:params [0]}))
-
-;; --- routes ---
-
-(def routes
-  ;; we can trigger sse on/off
-  (make-routes [["/" #_{:sse false} page]]))
-
-;; --- app ---
-
-(def default-port 3030)
-
-(def main-handler
-  (ring/ring-handler
-   (ring/router routes)))
-
-(mount/defstate server
-  :start (http/start-server main-handler {:port default-port})
-  :stop (when server (.close server)))
-
-(defn go []
-  (mount/start)
-  :ready)
-
-(defn reset []
-  (mount/stop)
-  (tn/refresh :after 'user/go)
-  :reset)
-
-(defn stop []
-  (mount/stop)
-  :stopped)
-
-(comment
-  (go)
-  (reset))
-
-(comment
-  ;; update value, should be reflected in sink view
-  (reset! +example-source+ "NEW VALUE"))

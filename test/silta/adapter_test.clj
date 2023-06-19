@@ -73,28 +73,28 @@
                      [va "hello"]
                      [vb 1 2]]))))
     (testing "with seq of hiccup"
-      (let [hs `([:div [:span "what's"]]
-                 [:div [:span "up"]])]
+      (let [hs [[:div [:span "what's"]]
+                [:div [:span "up"]]]]
         (is (= hs (adapt hs))))
-      (is (= `([:div [:span "first"]]
-               [:div
+      (is (= [[:div [:span "first"]]
+              [:div
+               [:div {:silta-view-name "silta.adapter-test/va"
+                      :silta-view-type "view"
+                      :silta-view-id "<id>"}
+                "got: hello"]]]
+             (adapt [[:div [:span "first"]]
+                     [:div [va "hello"]]]))))
+    (testing "with seq of forms"
+      (letfn [(test-fn [x] x)]
+        (is (= [(test-fn 'x)
+                nil
                 [:div {:silta-view-name "silta.adapter-test/va"
                        :silta-view-type "view"
                        :silta-view-id "<id>"}
-                 "got: hello"]])
-             (adapt `([:div [:span "first"]]
-                      [:div [va "hello"]])))))
-    (testing "with seq of forms"
-      (letfn [(test-fn [x] x)]
-        (is (= `((test-fn ~'x)
-                 nil
-                 [:div {:silta-view-name "silta.adapter-test/va"
-                        :silta-view-type "view"
-                        :silta-view-id "<id>"}
-                  "got: hello, there"])
-               (adapt `((test-fn ~'x)
-                        nil
-                        [va "hello, there"]))))))))
+                 "got: hello, there"]]
+               (adapt [(test-fn 'x)
+                       nil
+                       [va "hello, there"]])))))))
 
 (deftest test-process-form
   (testing "with let forms"

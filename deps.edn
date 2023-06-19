@@ -10,11 +10,14 @@
  :aliases
  {:dev {:extra-paths ["dev" "test"]
         :extra-deps {mount/mount {:mvn/version "0.1.17"}
+                     io.github.pfeodrippe/wally {:mvn/version "0.0.4"}
                      org.clojure/tools.namespace {:mvn/version "1.4.1"}}}
 
   :hiccup {:extra-deps {hiccup/hiccup {:mvn/version "1.0.5"}}}
 
   :test {:extra-paths ["test"]
          :extra-deps {lambdaisland/kaocha {:mvn/version "1.78.1249"}
+                      io.github.pfeodrippe/wally {:mvn/version "0.0.4"}
+                      mount/mount {:mvn/version "0.1.17"}
                       hiccup/hiccup {:mvn/version "1.0.5"}}
          :main-opts ["-m" "kaocha.runner"]}}}

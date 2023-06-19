@@ -22,15 +22,27 @@
 (defview ^:no-html vb*
   {:before identity}
   [{[x y] :params :as _request}]
+  ; (def *req* _request) ;; FIXME: currently not possible
   [:div
    [:span (format "x is %s" x)]
    [:span (format "y is %s" y)]])
 
+;; FIXME: if we reverse `va` and `vb` calling order,
+;; that changes the resultant hiccup (likely since `vb` called with params, and `va` is constant)
 (defview ^:no-html ^:sink vc
   [x]
   [:div
    [va]
    [vb x x]])
+
+(comment
+  (silta.adapter/adapt
+    (silta.adapter/adapt
+      ((:renderer vb) {:params [1 1]})))
+
+  ((:renderer vc) {:params [1]})
+  ((:renderer va) {:params []})
+  ((:renderer vb*) {:params [1 2]}))
 
 (defonce test-atom
   (atom 1))

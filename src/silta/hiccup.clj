@@ -20,18 +20,22 @@
    (and (view? x)
         (get-in x [:context :sink]))))
 
+;; TODO: remove?
 (defn hiccup?
   [?h]
   (and (vector? ?h)
        (keyword? (first ?h))))
 
 (defn hiccup+?
-  "Regular hiccup, but also recognize views"
+  "Regular hiccup, but also recognize views and seqs of hiccup
+  (e.g., generated via `for`)"
   [?h]
-  (and (vector? ?h)
-       (let [elt (first ?h)]
-         (or (keyword? elt)
-             (view? elt)))))
+  (or (and (vector? ?h)
+           (let [elt (first ?h)]
+             (or (keyword? elt)
+                 (view? elt))))
+      (and (seq? ?h)
+           (hiccup+? (first ?h)))))
 
 (defn get-attrs
   [[_ ?attrs]]
@@ -79,10 +83,7 @@
 (defn hiccup-zip
   "Create a zipper for extended Hiccup traversal"
   [root]
-  (zip/zipper hiccup+?
-              get-children
-              set-children
-              root))
+  (zip/zipper hiccup+? get-children set-children root))
 
 (defn edit-hiccup
   "Edit all Hiccup elements in `h` with `(f element)`"
@@ -92,6 +93,20 @@
       (zip/end? zipper)    (zip/root zipper)
       (zip/branch? zipper) (recur (zip/next (zip/edit zipper f)))
       :else                (recur (zip/next zipper)))))
+
+(defn unroll-hiccup
+  "Unrolls any seqs inside hiccup"
+  [h]
+  (reduce (fn [acc x]
+            (if (seq? x)
+              (into acc x)
+              (conj acc x)))
+          []
+          h))
+
+(comment
+  (def *h* [:ul {:test 1} "jepu" (for [i (range 3)] [:li i])])
+  (edit-hiccup *h* identity))
 
 (defn as-event-type
   "Convert attribute into event type.
