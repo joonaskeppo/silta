@@ -50,7 +50,7 @@
 (defn set-attrs
   "Set a Hiccup vector's attributes as the provided `attrs`"
   [[elt :as h] attrs]
-  (if attrs
+  (if (seq attrs)
     (if-let [children (get-children h)]
       (into [elt attrs] children)
       [elt attrs])

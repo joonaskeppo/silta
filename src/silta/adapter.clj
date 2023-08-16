@@ -4,7 +4,7 @@
   (:require [silta.hiccup :as sh]
             [silta.html :refer [html]]
             [silta.sources :as sources]
-            [silta.utils :refer [clj->json]]
+            [silta.utils :refer [clj->json map-vals]]
             [clojure.walk :as walk]))
 
 ;; TODO: split into two namespaces -> adapter.comptime, adapter.runtime
@@ -78,6 +78,24 @@
             x))
         params))
 
+(def ^:private ^:const dynamic-identifier
+  "__silta-dynamic")
+
+(defn- prepare-view-args
+  "Transform any dynamic args into a format recognized by client.
+  Dynamic args are values in `args` that are in hiccup format."
+  [args]
+  (map-vals (fn [x]
+              (if (sh/hiccup? x)
+                (let [f-name (subs (str (first x)) 1)] ; :name/space -> "name/space"
+                  (into [dynamic-identifier f-name] (rest x)))
+                x))
+            args))
+
+(comment
+  (prepare-view-args {:some-input-value [:value "#my-div"]
+                      :as-is ["some" "values"]}))
+
 (defn adapt-events
   "Adapt event handlers for attribute map `attrs`"
   [attrs]
@@ -94,7 +112,7 @@
                                               ?h (get event last-idx)
                                               [elt :as h] (when (vector? ?h) ?h)]]
                                     (if (and h (silta.hiccup/view? elt))
-                                      (let [serialized-view (update h 0 :endpoint)]
+                                      (let [serialized-view (-> h (update 0 :endpoint) (sh/update-attrs prepare-view-args))]
                                         (assoc event last-idx serialized-view))
                                       ;; add event 
                                       event))])
@@ -109,7 +127,7 @@
 (comment
   (adapt-events {:on-click [[:prepend {:target "#todo-list:first-child"}
                              [:div {:text [:value "#new-todo"]
-                                         :checked false}]]]})
+                                    :checked false}]]]})
   (adapt-events {:on-click [[:remove {:target "#todo-1"}]]}))
 
 (defn extract-values

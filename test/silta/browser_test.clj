@@ -29,6 +29,11 @@
   :stop (when server (.close server)))
 
 (comment
+  ;; reset
+  (do
+    (mount/stop)
+    (mount/start [#'server]))
+
   (mount/start [#'server])
   (mount/stop))
 

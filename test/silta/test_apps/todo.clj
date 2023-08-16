@@ -11,28 +11,23 @@
 
 (defview todo-item
   [{:keys [text checked]}]
-  (if checked
-    [:s text]
-    [:span text]))
+  (let [item-id (str "todo-" (random-uuid))]
+    [:li {:id item-id}
+     (if checked
+       [:s text]
+       [:span text])
+     [:button {:data-test "remove-todo-button"
+               ;; FIXME: something wrong?
+               :on-click [[:remove {:target (str "#" item-id)}]]}
+      "Remove"]]))
 
 (defview todo-list
   "Show list of all (removable) todos"
   [todos]
   [:ul#todo-list
    ;; TODO: add unit test for this kind of `for` wrappage case
-   (for [idx (range (count todos))
-         :let [item-id (str "todo-" (inc idx))
-               {:keys [text checked]} (get todos idx)]]
-     [:li {:id item-id}
-      [todo-item {:text text :checked checked}]
-      [:button {:data-test "remove-todo-button"
-                ;; FIXME: something wrong?
-                :on-click [[:remove {:target (str "#" item-id)}]]}
-       "Remove"]])])
-
-(comment
-  ((:renderer todo-item) {:params {:text "hello" :checked true}})
-  ((:renderer todo-list) {:params [[{:text "hello" :checked true}]]}))
+   (for [todo todos]
+     [todo-item todo])])
 
 (defview add-todo
   "Input field to add a new todo item"
@@ -42,7 +37,7 @@
     [:input {:type "text"
              :id "new-todo"
              :data-test "add-todo-input"}]]
-   [:button {:on-click [[:prepend {:target "#todo-list:first-child"}
+   [:button {:on-click [[:prepend {:target "#todo-list"}
                          [todo-item {:text [:value "#new-todo"]
                                      :checked false}]]]}
     "Add"]])

@@ -8,6 +8,8 @@ const specialAttrs = {
     viewType: 'silta-view-type'
 }
 
+const dynamicDesignator = '__silta-dynamic';
+
 const eventsSelector =  '[' + specialAttrs.events + ']';
 
 const clientId = self.crypto.randomUUID();
@@ -43,13 +45,38 @@ function makeRequestUrl(endpoint, params) {
     return endpoint + makeQueryString({"__params": JSON.stringify(params)});
 }
 
+// A poor man's version of Clojure's `prewalk`
+function walk(f, obj_) {
+    const obj = f(obj_);
+    if (Array.isArray(obj)) {
+        return obj.map((x) => walk(f, x));
+    } else if (typeof obj === "object") {
+        return Object.fromEntries(Object.entries(obj).map(([key, value]) => [walk(f, key), walk(f, value)]));
+    }
+    return obj;
+}
+
+// TODO: handle cases like [:value ".some-selector"]
+function parseConfig(config) {
+    return config;
+}
+
+// rules for how to resolve things dynamically
+const dynamicParamResolutions = {
+    "value": (args) => document.querySelector(args[0]).value
+}
+
+// TODO: add documentation (input, output)
 function parseEvent(event, viewId) {
     const thisViewSelector = `[silta-view-id="${viewId}"]`;
     const withoutConfig = Array.isArray(event[1]);
+    const baseEndpoint = withoutConfig ? event[1] : event[2];
     let type, config, endpoint;
 
+    // prepend, append, ...
     type = event[0];
 
+    // event config (e.g., map with target of prepend)
     config = withoutConfig ?
         { target: viewId ? thisViewSelector : undefined } :
         {
@@ -58,62 +85,96 @@ function parseEvent(event, viewId) {
                 event[1].target :
                 (viewId ? thisViewSelector : undefined)
         };
+    config = parseConfig(config); // resolve any dynamic inferences
 
-    endpoint = withoutConfig ? event[1] : event[2];
-    endpoint = endpoint &&
+    endpoint = baseEndpoint &&
         {
             method: 'GET',
-            url: makeRequestUrl(endpoint[0], endpoint.slice(1))
+            makeUrl: () => { // as fn to accomodate dynamic inferences
+                const url = baseEndpoint[0];
+                const params = walk((x) => {
+                    if (Array.isArray(x) && x[0] === dynamicDesignator) {
+                        const resolver = dynamicParamResolutions[x[1]];
+                        const args = x.slice(2);
+                        return resolver(args);
+                    }
+                    return x;
+                }, baseEndpoint.slice(1));
+
+                return makeRequestUrl(url, params);
+            }
         };
 
     return { type, config, endpoint };
 }
 
+function queryEventfulNodes(node) {
+    if (node instanceof HTMLElement) {
+        const thisNode = node.attributes['silta-events'] && node;
+        const childNodes = Array.from(node.querySelectorAll('[silta-events]'));
+        
+        return thisNode ? childNodes.concat(thisNode) : childNodes;
+    }
+}
+
+function queryEventfulNodesInNodes(nodes) {
+    const eventNodes = nodes.map(queryEventfulNodes)
+                            .filter((x) => x) // drop undefineds
+                            .flat(1);         // array of arrays -> flattened array of nodes
+
+    // return unique nodes
+    return [...new Set(eventNodes)];
+}
+
 function setupEventHandlers(nodes) {
-    nodes.forEach((node) => {
+    const eventNodes = queryEventfulNodesInNodes(nodes);
+
+    if (eventNodes.length === 0) {
+        console.log("No events for nodes, skipping:", nodes);
+        return;
+    }
+
+    // iterate over unique nodes
+    eventNodes.forEach((node) => {
         const stringifiedEvents = node.getAttribute(specialAttrs.events);
-        if (!stringifiedEvents) {
-            console.log("No events for node, skipping:", node)
-        }
-        if (stringifiedEvents) {
-            try {
-                const events = JSON.parse(stringifiedEvents);
-                const viewId = node.getAttribute(specialAttrs.viewId);
 
-                Object.keys(events).forEach((eventType) => {
-                    let callbacks = [];
+        try {
+            const events = JSON.parse(stringifiedEvents);
+            const viewId = node.getAttribute(specialAttrs.viewId);
 
-                    events[eventType].forEach((event) => {
-                        const { type, config, endpoint } = parseEvent(event, viewId);
+            Object.keys(events).forEach((eventType) => {
+                let callbacks = [];
 
-                        if (config && !config.target) {
-                            console.error('Failed to setup event -- could not infer target:', { node, descriptor, config });
-                        }
+                events[eventType].forEach((event) => {
+                    const { type, config, endpoint } = parseEvent(event, viewId);
 
-                        console.log(`Adding '${eventType}' type listener for node:`, node);
+                    if (config && !config.target) {
+                        console.error('Failed to setup event -- could not infer target:', { node, descriptor, config });
+                    }
 
-                        if (!endpoint) {
-                            // descriptor does not contain 'endpoint' description -> `null` resultant HTML
-                            callbacks.push(() => handleUpdate(type, config)(null));
-                        } else {
-                            const handler = handleUpdate(type, config);
+                    console.log(`Adding '${eventType}' type listener for node:`, node);
 
-                            console.log(`Initializing '${type}' action with endpoint:`, config, endpoint, handler);
+                    if (!endpoint) {
+                        // descriptor does not contain 'endpoint' description -> `null` resultant HTML
+                        callbacks.push(() => handleUpdate(type, config)(null));
+                    } else {
+                        const handler = handleUpdate(type, config);
 
-                            callbacks.push(() => handleAjaxRequest(endpoint, handler));
-                        }
-                    });
+                        console.log(`Initializing '${type}' action with endpoint:`, config, endpoint, handler);
 
-                    // attach all callbacks to single event listener of given type
-                    node.addEventListener(eventType, () => {
-                        console.log(`Calling ${callbacks.length} '${eventType}' callbacks for node:`, node);
-                        callbacks.forEach((cb) => cb());
-                    });
+                        callbacks.push(() => handleAjaxRequest(endpoint, handler));
+                    }
                 });
-            } catch (error) {
-                console.error("Failed to parse events for node:", node);
-                console.error(error);
-            }
+
+                // attach all callbacks to single event listener of given type
+                node.addEventListener(eventType, () => {
+                    console.log(`Calling ${callbacks.length} '${eventType}' callbacks for node:`, node);
+                    callbacks.forEach((cb) => cb());
+                });
+            });
+        } catch (error) {
+            console.error("Failed to parse events for node:", node);
+            console.error(error);
         }
     });
 }
@@ -128,7 +189,7 @@ function handleAjaxRequest(req, handler) {
         }
     }
     // send request
-    xhr.open(req.method, req.url);
+    xhr.open(req.method, req.makeUrl());
     xhr.setRequestHeader('client-id', clientId);
     xhr.send();
 }
