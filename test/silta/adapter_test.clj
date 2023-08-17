@@ -37,7 +37,7 @@
       (is (= attrs (adapt-attrs attrs)))))
   (testing "with `on-click`"
     (is (= {:class "my-class unchanged"
-            :silta-events (clj->json {:click [[:swap {:target "some-target"} ["/va" "new"]]]})}
+            :data-silta-events (clj->json {:click [[:swap {:target "some-target"} ["/va" "new"]]]})}
            (adapt-attrs {:class "my-class unchanged"
                          :on-click [[:swap {:target "some-target"} [va "new"]]]})))))
 
@@ -56,17 +56,17 @@
         (is (= h (adapt h)))))
     (testing "with hiccup containing views"
       (is (= [:div
-              [:div {:silta-view-name "silta.adapter-test/va"
-                     :silta-view-type "view"
-                     :silta-view-id "<id>"}
+              [:div {:data-silta-view-name "silta.adapter-test/va"
+                     :data-silta-view-type "view"
+                     :data-silta-view-id "<id>"}
                "got: hello"]
               [:div {:id "vb-root"
-                     :silta-view-name "silta.adapter-test/vb"
-                     :silta-view-type "view"
-                     :silta-view-id "<id>"}
+                     :data-silta-view-name "silta.adapter-test/vb"
+                     :data-silta-view-type "view"
+                     :data-silta-view-id "<id>"}
                [:span 1 2]
                [:button {:class "btn btn-style"
-                         :silta-events (clj->json {:click [[:swap {:target "#vb-root"}
+                         :data-silta-events (clj->json {:click [[:swap {:target "#vb-root"}
                                                             ["/va" "replaced!"]]]})}
                 "Click Me!"]]]
              (adapt [:div
@@ -78,9 +78,9 @@
         (is (= hs (adapt hs))))
       (is (= [[:div [:span "first"]]
               [:div
-               [:div {:silta-view-name "silta.adapter-test/va"
-                      :silta-view-type "view"
-                      :silta-view-id "<id>"}
+               [:div {:data-silta-view-name "silta.adapter-test/va"
+                      :data-silta-view-type "view"
+                      :data-silta-view-id "<id>"}
                 "got: hello"]]]
              (adapt [[:div [:span "first"]]
                      [:div [va "hello"]]]))))
@@ -88,9 +88,9 @@
       (letfn [(test-fn [x] x)]
         (is (= [(test-fn 'x)
                 nil
-                [:div {:silta-view-name "silta.adapter-test/va"
-                       :silta-view-type "view"
-                       :silta-view-id "<id>"}
+                [:div {:data-silta-view-name "silta.adapter-test/va"
+                       :data-silta-view-type "view"
+                       :data-silta-view-id "<id>"}
                  "got: hello, there"]]
                (adapt [(test-fn 'x)
                        nil
@@ -110,40 +110,40 @@
            (-process [:div "got: stuff"])))
     (is (= [:div {:top "div"}
             [:div {:id "vb-root"
-                   :silta-view-name "silta.adapter-test/vb"
-                   :silta-view-type "view"
-                   :silta-view-id "<id>"}
+                   :data-silta-view-name "silta.adapter-test/vb"
+                   :data-silta-view-type "view"
+                   :data-silta-view-id "<id>"}
              [:span "hello" "there"]
              [:button {:class "btn btn-style"
-                       :silta-events (clj->json {:click [[:swap {:target "#vb-root"}
+                       :data-silta-events (clj->json {:click [[:swap {:target "#vb-root"}
                                                           ["/va" "replaced!"]]]})}
               "Click Me!"]]]
            (-process [:div {:top "div"}
                       [vb "hello" "there"]])))
     (is (= [:div
             [:div
-             {:silta-view-name "silta.adapter-test/va"
-              :silta-view-type "view"
-              :silta-view-id "<id>"}
+             {:data-silta-view-name "silta.adapter-test/va"
+              :data-silta-view-type "view"
+              :data-silta-view-id "<id>"}
              "got: stuff"]
             [:div
-             {:silta-view-name "silta.adapter-test/va"
-              :silta-view-type "view"
-              :silta-view-id "<id>"}
+             {:data-silta-view-name "silta.adapter-test/va"
+              :data-silta-view-type "view"
+              :data-silta-view-id "<id>"}
              "got: and more"]]
            (-process [:div
                       [va "stuff"]
                       [va "and more"]])))
     (is (= [:div
-            [:span {:silta-view-id "<id>"
-                    :silta-view-type "sink"
-                    :silta-view-name "silta.adapter-test/vsink"}
+            [:span {:data-silta-view-id "<id>"
+                    :data-silta-view-type "sink"
+                    :data-silta-view-name "silta.adapter-test/vsink"}
              100]]
            (-process [:div [vsink 100]]))))
   (testing "with fully evaluated views, view mode"
-    (is (= [:div {:silta-view-name "my-view"
-                  :silta-view-type "view"
-                  :silta-view-id "<id>"}
+    (is (= [:div {:data-silta-view-name "my-view"
+                  :data-silta-view-type "view"
+                  :data-silta-view-id "<id>"}
             [:span "hello, there"]]
            (-process {:view-sym 'my-view
                       :view-name "my-view"}

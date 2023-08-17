@@ -76,26 +76,26 @@
   (testing "with no parameters"
     (is (non-sink-view? va))
     (is (= "/va" (:endpoint va)))
-    (is (= [:div {:silta-view-name "silta.core-test/va"
-                  :silta-view-type "view"
-                  :silta-view-id "<id>"}
+    (is (= [:div {:data-silta-view-name "silta.core-test/va"
+                  :data-silta-view-type "view"
+                  :data-silta-view-id "<id>"}
             "Something here"]
            (render va))))
   (testing "with parameters, no nested views"
     (is (non-sink-view? vb))
     (is (= "/vb" (:endpoint vb)))
-    (is (= [:div {:silta-view-name "silta.core-test/vb"
-                  :silta-view-type "view"
-                  :silta-view-id "<id>"}
+    (is (= [:div {:data-silta-view-name "silta.core-test/vb"
+                  :data-silta-view-type "view"
+                  :data-silta-view-id "<id>"}
             [:span "x is 1"]
             [:span "y is 2"]]
            (render vb 1 2))))
   (testing "with full request map"
     (is (non-sink-view? vb*))
     (is (= "/vb*" (:endpoint vb*)))
-    (is (= [:div {:silta-view-name "silta.core-test/vb*"
-                  :silta-view-type "view"
-                  :silta-view-id "<id>"}
+    (is (= [:div {:data-silta-view-name "silta.core-test/vb*"
+                  :data-silta-view-type "view"
+                  :data-silta-view-id "<id>"}
             [:span "x is 1"]
             [:span "y is 2"]]
            (render vb* 1 2))))
@@ -103,16 +103,16 @@
   (testing "with `:sink`"
     (is (sink? vc))
     (is (= "/vc" (:endpoint vc)))
-    (is (= [:div {:silta-view-name "silta.core-test/vc"
-                  :silta-view-type "sink"
-                  :silta-view-id "<id>"}
-            [:div {:silta-view-name "silta.core-test/va"
-                   :silta-view-type "view"
-                   :silta-view-id "<id>"}
+    (is (= [:div {:data-silta-view-name "silta.core-test/vc"
+                  :data-silta-view-type "sink"
+                  :data-silta-view-id "<id>"}
+            [:div {:data-silta-view-name "silta.core-test/va"
+                   :data-silta-view-type "view"
+                   :data-silta-view-id "<id>"}
              "Something here"]
-            [:div {:silta-view-name "silta.core-test/vb"
-                   :silta-view-type "view"
-                   :silta-view-id "<id>"}
+            [:div {:data-silta-view-name "silta.core-test/vb"
+                   :data-silta-view-type "view"
+                   :data-silta-view-id "<id>"}
              [:span "x is 1"]
              [:span "y is 1"]]]
            (render vc 1)))))

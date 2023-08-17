@@ -2,10 +2,10 @@
 
 // Silta-specific HTML element attributes
 const specialAttrs = {
-    events: 'silta-events',
-    viewId: 'silta-view-id',
-    viewName: 'silta-view-name',
-    viewType: 'silta-view-type'
+    events: 'data-silta-events',
+    viewId: 'data-silta-view-id',
+    viewName: 'data-silta-view-name',
+    viewType: 'data-silta-view-type'
 }
 
 const dynamicDesignator = '__silta-dynamic';
@@ -14,7 +14,7 @@ const eventsSelector =  '[' + specialAttrs.events + ']';
 
 const clientId = self.crypto.randomUUID();
 
-// event handlers are provided as `silta-events` (map of 2d arrays)
+// event handlers are provided as `data-silta-events` (map of 2d arrays)
 function findElementsWithEvents(nodes) {
     return nodes.reduce((acc, node) => {
         if (node.hasAttribute(specialAttrs.events)) {
@@ -68,7 +68,7 @@ const dynamicParamResolutions = {
 
 // TODO: add documentation (input, output)
 function parseEvent(event, viewId) {
-    const thisViewSelector = `[silta-view-id="${viewId}"]`;
+    const thisViewSelector = `[${specialAttrs.viewId}="${viewId}"]`;
     const withoutConfig = Array.isArray(event[1]);
     const baseEndpoint = withoutConfig ? event[1] : event[2];
     let type, config, endpoint;
@@ -110,8 +110,8 @@ function parseEvent(event, viewId) {
 
 function queryEventfulNodes(node) {
     if (node instanceof HTMLElement) {
-        const thisNode = node.attributes['silta-events'] && node;
-        const childNodes = Array.from(node.querySelectorAll('[silta-events]'));
+        const thisNode = node.attributes[specialAttrs.events] && node;
+        const childNodes = Array.from(node.querySelectorAll(`[${specialAttrs.events}]`));
         
         return thisNode ? childNodes.concat(thisNode) : childNodes;
     }

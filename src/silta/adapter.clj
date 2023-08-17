@@ -118,7 +118,7 @@
                                       event))])
                     (into {}))]
     (cond-> (apply dissoc attrs (map first event-keys-and-types))
-      (seq events) (assoc :silta-events (clj->json events)))))
+      (seq events) (assoc :data-silta-events (clj->json events)))))
 
 (defn adapt-attrs
   [attrs]
@@ -128,7 +128,7 @@
   (adapt-events {:on-click [[:prepend {:target "#todo-list:first-child"}
                              [:div {:text [:value "#new-todo"]
                                     :checked false}]]]})
-  (adapt-events {:on-click [[:remove {:target "#todo-1"}]]}))
+  (adapt-events {:on-click [[:dom.node/remove {:target "#todo-1"}]]}))
 
 (defn extract-values
   "Transform sources found within `x` into their values"
@@ -183,9 +183,9 @@
         ;; FIXME: can improve on `const-attrs` (also: move into separate fn -> test)
         ;; (e.g., now returning false when second elt is hiccup w/ inner forms)
         const-attrs (and (vector? form*) (every? literal? (take 2 form*)))
-        new-attrs {:silta-view-name view-name
-                   :silta-view-type (if sink "sink" "view")
-                   :silta-view-id view-id}]
+        new-attrs {:data-silta-view-name view-name
+                   :data-silta-view-type (if sink "sink" "view")
+                   :data-silta-view-id view-id}]
     (if const-attrs
       (let [old-attrs (sh/get-attrs form*)]
         (->> (merge old-attrs new-attrs)

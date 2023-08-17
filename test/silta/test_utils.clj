@@ -9,7 +9,7 @@
          (fn [x]
            (if (map? x)
              (cond-> x
-               (contains? x :silta-view-id) (assoc :silta-view-id "<id>"))
+               (contains? x :data-silta-view-id) (assoc :data-silta-view-id "<id>"))
              x)))))
 
 (defmacro -process
