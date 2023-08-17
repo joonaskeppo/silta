@@ -1,4 +1,4 @@
-(ns silta.test-apps.basic
+(ns silta.test-apps.counter
   "A super simple button clicker app"
   (:require [silta.core :refer [defview make-routes]]
             [silta.hiccup :as sh]
@@ -40,11 +40,6 @@
       "No clicks here"
       (format "Clicked %s times..." counter))]])
 
-(defview test-appender
-  {:before identity}
-  [{[{:keys [counter]}] :params}]
-  [:span (apply str (take counter (repeat ".")))])
-
 (defview button
   {:after (fn [res]
             (tap> [:button/after res])
@@ -53,9 +48,6 @@
   [:button {:data-test "click-me"
             :on-click [[:swap {:target "#notice"}
                         [notice {:counter (inc counter)}]]  ;; replaces arbitrary elements with querySelectorAll
-                       ;; FIXME: need to have a way to deal with sequential updates
-                       #_[:append {:target "#notice"}
-                          [test-appender {:counter (inc counter)}]] ;; append dots
                        [:swap
                         [button (inc counter)]]]} ;; replace this specific `button` DOM element
    (if (zero? counter)

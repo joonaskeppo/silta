@@ -10,12 +10,18 @@
 ;; => `/todo/item`, `/todo/list`
 
 (defview todo-item
-  [{:keys [text checked]}]
+  [{:keys [text checked] :as inp}]
   (let [item-id (str "todo-" (random-uuid))]
     [:li {:id item-id}
      (if checked
        [:s text]
        [:span text])
+     [:button {:data-test "toggle-competion-button"
+               :on-click [[:swap {:target (str "#" item-id)}
+                           [todo-item (update inp :checked not)]]]}
+      (if checked
+        "Still in progress"
+        "Completed")]
      [:button {:data-test "remove-todo-button"
                :on-click [[:dom.node/remove {:target (str "#" item-id)}]]}
       "Remove"]]))

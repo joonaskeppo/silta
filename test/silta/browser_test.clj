@@ -9,7 +9,7 @@
             [mount.core :as mount]
             [silta.core :refer [make-routes]]
             ;; -- apps --
-            [silta.test-apps.basic :as basic-app]
+            [silta.test-apps.counter :as counter-app]
             [silta.test-apps.todo :as todo-app]))
 
 ;; --- app ---
@@ -17,7 +17,7 @@
 (def default-port 3080)
 
 (def all-routes
-  (make-routes [["/basic" basic-app/page]
+  (make-routes [["/counter" counter-app/page]
                 ["/todo" todo-app/page]]))
 
 (def main-handler
@@ -50,10 +50,22 @@
 
 (use-fixtures :once headless-mode wrap-app)
 
+;; --- utils ---
+
+(defn- text-content [selector]
+  (.textContent (w/-query selector)))
+
+(defn- input-value [selector]
+  (.inputValue (w/-query (s/input selector))))
+
 ;; --- tests ---
 
-(deftest test-basic-app
-  (w/navigate "http://localhost:3080/basic")
+(defn app-url
+  [app]
+  (format "http://localhost:%s/%s" default-port app))
+
+(deftest test-counter-app
+  (w/navigate (app-url "counter"))
 
   ;; prior to clicks
   (w/in-viewport? (s/div (ws/text "No clicks here")))
@@ -67,3 +79,39 @@
   (w/in-viewport? (s/div (ws/text "Clicked 2 times...")))
   
   (is true))
+
+(deftest test-todo-app
+  (w/navigate (app-url "todo"))
+  
+  ;; prior to actions
+  (w/in-viewport? (s/s (ws/text "Make todo app")))
+  (w/in-viewport? (s/span (ws/text "Make it pretty")))
+
+  ;; toggle first item status
+  (w/click (s/> (s/li (s/first-of-type))
+                (s/button (ws/text "Still in progress"))))
+  (w/in-viewport? (s/span (ws/text "Make todo app")))
+
+  ;; remove both items
+  (is (seq (text-content (s/ul "#todo-list"))))
+  (w/click (s/> (s/li (s/nth-of-type "2"))
+                (s/button (ws/text "Remove"))))
+  (w/click (s/> (s/li (s/first-of-type))
+                (s/button (ws/text "Remove"))))
+  (is (empty? (text-content (s/ul "#todo-list"))))
+
+  ;; add new items
+  (letfn [(add-todo [item]
+            (w/fill (s/input (s/attr "data-test" "=" "add-todo-input")) item)
+            (is (= item (input-value (s/attr "data-test" "=" "add-todo-input"))))
+            (w/keyboard-press "Enter")
+            (is (empty? (input-value (s/attr "data-test" "=" "add-todo-input"))))
+            (w/in-viewport? (s/span (ws/text item))))]
+    (add-todo "get milk")
+    (add-todo "get cookies"))
+  
+  ;; toggle first item
+  (w/click (s/> (s/li (s/first-of-type))
+                (s/button (ws/text "Completed"))))
+  (w/in-viewport? (s/> (s/li (s/first-of-type))
+                       (s/button (ws/text "Still in progress")))))
