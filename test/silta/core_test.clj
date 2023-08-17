@@ -1,6 +1,7 @@
 (ns silta.core-test
   (:require [clojure.test :refer [deftest is testing]]
             [clojure.set :as set]
+            [clojure.string :as str]
             [clojure.walk]
             [silta.test-utils :refer [mangle-attrs]]
             [silta.core :refer [defview make-routes]]
@@ -83,7 +84,7 @@
 (deftest test-defview
   (testing "with no parameters"
     (is (non-sink-view? va))
-    (is (= "/va" (:endpoint va)))
+    (is (str/ends-with? (:endpoint va) "/core-test/va"))
     (is (= [:div {:data-silta-view-name "silta.core-test/va"
                   :data-silta-view-type "view"
                   :data-silta-view-id "<id>"}
@@ -91,7 +92,7 @@
            (render va))))
   (testing "with parameters, no nested views"
     (is (non-sink-view? vb))
-    (is (= "/vb" (:endpoint vb)))
+    (is (str/ends-with? (:endpoint vb) "/core-test/vb"))
     (is (= [:div {:data-silta-view-name "silta.core-test/vb"
                   :data-silta-view-type "view"
                   :data-silta-view-id "<id>"}
@@ -100,7 +101,7 @@
            (render vb 1 2))))
   (testing "with full request map"
     (is (non-sink-view? vb*))
-    (is (= "/vb*" (:endpoint vb*)))
+    (is (str/ends-with? (:endpoint vb*) "/core-test/vb*"))
     (is (= [:div {:data-silta-view-name "silta.core-test/vb*"
                   :data-silta-view-type "view"
                   :data-silta-view-id "<id>"}
@@ -110,7 +111,7 @@
   ;; simply tests def'ing the sink, not actually any live updates
   (testing "with `:sink`"
     (is (sink? vc))
-    (is (= "/vc" (:endpoint vc)))
+    (is (str/ends-with? (:endpoint vc) "/core-test/vc"))
     (is (= [:div {:data-silta-view-name "silta.core-test/vc"
                   :data-silta-view-type "sink"
                   :data-silta-view-id "<id>"}
@@ -135,4 +136,12 @@
 ;; TODO: more comprehensive route tests
 (deftest test-make-routes
   (testing "with test page, should set up routes for all views + SSE route due to sink"
-    (is (set/subset? #{"/" "/va" "/vb" "/vc"} (get-endpoints [["/" test-page]])))))
+    (is (set/subset? #{"/core-test/va"
+                       "/core-test/vb"
+                       "/core-test/vb*"
+                       "/core-test/vc"
+                       "/core-test/side-effectful"}
+                     (->> (get-endpoints [["/" test-page]])
+                          (filter #(re-find #"core-test/" %))
+                          (map #(str/replace % #"/silta" ""))
+                          set)))))

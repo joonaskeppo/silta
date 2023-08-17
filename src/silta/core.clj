@@ -16,10 +16,16 @@
   view-registry
   (atom {}))
 
+;; TODO: as higher-order fn
+;; => endpoints determined at runtime, not compile-time
+;; => able to minify routes (e.g., `silta/adapter-test/va` -> `adapter-test/va`)
 (defn- make-endpoint
   "Generate endpoint route for view"
-  [{:keys [path name] :as _props}]
-  (or path (str "/" name)))
+  [{:keys [path name ns] :as _props}]
+  (or path (format "/%s/%s" (str/replace ns "." "/") name)))
+
+(comment
+  (make-endpoint {:name "va" :ns "silta.adapter-test"}))
 
 (def ^:private count-not-nils
   (comp count (partial filter some?)))
@@ -116,7 +122,7 @@
         arglist (get-view-arg args vector? [docstring props])
         body (get-view-arg args any? [docstring props arglist] true)
         metadata (update (meta vname) :doc #(or % docstring))
-        endpoint (make-endpoint (assoc props :name vname))
+        endpoint (make-endpoint (assoc props :ns (str *ns*) :name vname))
         final-props (merge default-props props)
         qualified-name (format "%s/%s" *ns* vname)
         renderer (make-renderer {:context {:arglist arglist

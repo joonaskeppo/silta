@@ -37,7 +37,8 @@
       (is (= attrs (adapt-attrs attrs)))))
   (testing "with `on-click`"
     (is (= {:class "my-class unchanged"
-            :data-silta-events (clj->json {:click [[:swap {:target "some-target"} ["/va" "new"]]]})}
+            :data-silta-events (clj->json {:click [[:swap {:target "some-target"}
+                                                    ["/silta/adapter-test/va" "new"]]]})}
            (adapt-attrs {:class "my-class unchanged"
                          :on-click [[:swap {:target "some-target"} [va "new"]]]})))))
 
@@ -67,7 +68,7 @@
                [:span 1 2]
                [:button {:class "btn btn-style"
                          :data-silta-events (clj->json {:click [[:swap {:target "#vb-root"}
-                                                            ["/va" "replaced!"]]]})}
+                                                            ["/silta/adapter-test/va" "replaced!"]]]})}
                 "Click Me!"]]]
              (adapt [:div
                      [va "hello"]
@@ -116,7 +117,7 @@
              [:span "hello" "there"]
              [:button {:class "btn btn-style"
                        :data-silta-events (clj->json {:click [[:swap {:target "#vb-root"}
-                                                          ["/va" "replaced!"]]]})}
+                                                          ["/silta/adapter-test/va" "replaced!"]]]})}
               "Click Me!"]]]
            (-process [:div {:top "div"}
                       [vb "hello" "there"]])))
