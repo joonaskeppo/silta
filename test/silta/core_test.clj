@@ -22,7 +22,6 @@
 (defview ^:no-html vb*
   {:before identity}
   [{[x y] :params :as _request}]
-  ; (def *req* _request) ;; FIXME: currently not possible
   [:div
    [:span (format "x is %s" x)]
    [:span (format "y is %s" y)]])
@@ -35,11 +34,20 @@
    [va]
    [vb x x]])
 
+(def boom (atom :bip))
+
+(defview ^:no-html side-effectful
+  []
+  (reset! boom :BAP)
+  [:div
+   [:span "This is still rendered"]])
+
 (comment
   (silta.adapter/adapt
     (silta.adapter/adapt
       ((:renderer vb) {:params [1 1]})))
 
+  ((:renderer side-effectful) {:params []})
   ((:renderer vc) {:params [1]})
   ((:renderer va) {:params []})
   ((:renderer vb*) {:params [1 2]}))
@@ -99,7 +107,7 @@
             [:span "x is 1"]
             [:span "y is 2"]]
            (render vb* 1 2))))
-    ;; simply tests def'ing the sink, not actually any live updates
+  ;; simply tests def'ing the sink, not actually any live updates
   (testing "with `:sink`"
     (is (sink? vc))
     (is (= "/vc" (:endpoint vc)))
@@ -115,7 +123,14 @@
                    :data-silta-view-id "<id>"}
              [:span "x is 1"]
              [:span "y is 1"]]]
-           (render vc 1)))))
+           (render vc 1))))
+  (testing "with side-effectful view"
+    (is (= [:div {:data-silta-view-name "silta.core-test/side-effectful"
+                  :data-silta-view-type "view"
+                  :data-silta-view-id "<id>"}
+            [:span "This is still rendered"]]
+           (render side-effectful)))
+    (is (= :BAP @boom))))
 
 ;; TODO: more comprehensive route tests
 (deftest test-make-routes

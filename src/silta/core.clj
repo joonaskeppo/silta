@@ -86,9 +86,13 @@
     `(comp ~after ~main-fn ~before ~update-params)))
 
 (defn- get-view-arg
-  [args pred predated-by]
-  (when-let [?arg (-> (count-not-nils predated-by) (drop args) first)]
-    (when (pred ?arg) ?arg)))
+  ([args pred predated-by]
+   (get-view-arg args pred predated-by false))
+  ([args pred predated-by all]
+   (when-let [?arg (if all
+                     (-> (count-not-nils predated-by) (drop args))
+                     (-> (count-not-nils predated-by) (drop args) first))]
+     (when (pred ?arg) ?arg))))
 
 (def default-props
   ;; pull out `:params` from (HTTP) request by default
@@ -110,7 +114,7 @@
   (let [docstring (get-view-arg args string? [])
         props (get-view-arg args map? [docstring])
         arglist (get-view-arg args vector? [docstring props])
-        body (get-view-arg args any? [docstring props arglist])
+        body (get-view-arg args any? [docstring props arglist] true)
         metadata (update (meta vname) :doc #(or % docstring))
         endpoint (make-endpoint (assoc props :name vname))
         final-props (merge default-props props)

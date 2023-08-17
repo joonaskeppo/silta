@@ -22,4 +22,4 @@
                default-opts)
         body (if use-opts (rest args) args)]
   `(mangle-attrs
-     (process ~opts ~@body))))
+     (process ~opts ~body))))

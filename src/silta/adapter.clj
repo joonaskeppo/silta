@@ -302,12 +302,20 @@
   [& args]
   (assert (#{1 2} (count args)) "Must provide 1 or 2 args to `process`")
   (let [opts (when (map? (first args)) (first args))
-        form (if opts (second args) (first args))]
+        form (if opts (second args) (first args))
+        side-effects (when-not (vector? form) (butlast form))
+        hiccup (if (vector? form) form (last form))]
     (binding [*compile-hiccup* (not (:no-html opts))]
       (let [processed-hiccup (if (:view-sym opts)
-                               (process-root-view-node opts form)
-                               (process-any form))]
-        (if (compile-hiccup? processed-hiccup)
-          `(html ~processed-hiccup)
-          processed-hiccup)))))
+                               (process-root-view-node opts hiccup)
+                               (process-any hiccup))]
+        (cond
+          (compile-hiccup? processed-hiccup)
+          `(do ~@side-effects (html ~processed-hiccup))
+
+          (empty? side-effects)
+          processed-hiccup
+
+          :else
+          `(do ~@side-effects ~processed-hiccup))))))
 
