@@ -167,7 +167,8 @@ function setupEventHandlers(nodes) {
                 });
 
                 // attach all callbacks to single event listener of given type
-                node.addEventListener(eventType, () => {
+                node.addEventListener(eventType, (e) => {
+                    e.preventDefault();
                     console.log(`Calling ${callbacks.length} '${eventType}' callbacks for node:`, node);
                     callbacks.forEach((cb) => cb());
                 });
