@@ -219,8 +219,12 @@ const elementUpdates = {
         elt.prepend(newElt);
         return [newElt];
     },
-    remove: (_, elt) => {
+    "dom.node/remove": (_, elt) => {
         elt.remove();
+        return [];
+    },
+    "dom.node/reset": (_, elt) => {
+        elt.reset();
         return [];
     }
 }

@@ -17,8 +17,7 @@
        [:s text]
        [:span text])
      [:button {:data-test "remove-todo-button"
-               ;; FIXME: something wrong?
-               :on-click [[:remove {:target (str "#" item-id)}]]}
+               :on-click [[:dom.node/remove {:target (str "#" item-id)}]]}
       "Remove"]]))
 
 (defview todo-list
@@ -32,15 +31,19 @@
 (defview add-todo
   "Input field to add a new todo item"
   []
-  [:div
-   [:label "Next todo:"
-    [:input {:type "text"
-             :id "new-todo"
-             :data-test "add-todo-input"}]]
-   [:button {:on-click [[:prepend {:target "#todo-list"}
-                         [todo-item {:text [:value "#new-todo"]
-                                     :checked false}]]]}
-    "Add"]])
+  (let [actions [[:prepend {:target "#todo-list"}
+                  [todo-item {:text [:value "#new-todo-input"]
+                              :checked false}]]
+                 [:dom.node/reset {:target "#new-todo-form"}]]]
+    [:form {:on-submit actions
+            :id "new-todo-form"}
+     [:label "Next todo:"
+      [:input {:type "text"
+               :id "new-todo-input"
+               :data-test "add-todo-input"}]]
+     [:button {:type "submit"
+               :on-click actions}
+      "Add"]]))
 
 (def page
   (let [initial-todos [{:text "Make todo app" :checked true}
