@@ -149,7 +149,7 @@ function setupEventHandlers(nodes) {
                     const { type, config, endpoint } = parseEvent(event, viewId);
 
                     if (config && !config.target) {
-                        console.error('Failed to setup event -- could not infer target:', { node, descriptor, config });
+                        console.error('Failed to setup event -- could not infer target:', { node, type, config, endpoint });
                     }
 
                     console.log(`Adding '${eventType}' type listener for node:`, node);
