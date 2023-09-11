@@ -1,10 +1,6 @@
 (ns silta.test-apps.todo
   "A barebones todo app"
-  (:require [silta.core :refer [defview make-routes]]
-            [aleph.http :as http]
-            [reitit.ring :as ring]
-            [mount.core :as mount]))
-
+  (:require [silta.core :refer [defview]]))
 
 ;; use `def`-compliant notation: `todo:item`, `todo:list`
 ;; => `/todo/item`, `/todo/list`

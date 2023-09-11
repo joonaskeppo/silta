@@ -66,6 +66,11 @@ const dynamicParamResolutions = {
     "value": (args) => document.querySelector(args[0]).value
 }
 
+// util to resolve params for cases like `[:dom.node.param/some-param some-selector]`
+function makeQueryParam(param, selector) {
+    return () => document.querySelector(selector)[param];
+}
+
 // TODO: add documentation (input, output)
 function parseEvent(event, viewId) {
     const thisViewSelector = `[${specialAttrs.viewId}="${viewId}"]`;
@@ -94,9 +99,8 @@ function parseEvent(event, viewId) {
                 const url = baseEndpoint[0];
                 const params = walk((x) => {
                     if (Array.isArray(x) && x[0] === dynamicDesignator) {
-                        const resolver = dynamicParamResolutions[x[1]];
-                        const args = x.slice(2);
-                        return resolver(args);
+                        const resolver = makeQueryParam(x[1], x[2]); // makeQueryParam(param, selector)
+                        return resolver();
                     }
                     return x;
                 }, baseEndpoint.slice(1));

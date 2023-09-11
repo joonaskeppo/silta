@@ -1,6 +1,7 @@
 (ns silta.browser-test
   (:require [clojure.test :refer [deftest is use-fixtures]]
             [clojure.set :as set]
+            [clojure.edn :as edn]
             [garden.selectors :as s]
             [reitit.ring :as ring]
             [aleph.http :as http]
@@ -10,7 +11,8 @@
             [silta.core :refer [make-routes]]
             ;; -- apps --
             [silta.test-apps.counter :as counter-app]
-            [silta.test-apps.todo :as todo-app]))
+            [silta.test-apps.todo :as todo-app]
+            [silta.test-apps.form :as form-app]))
 
 ;; --- app ---
 
@@ -18,7 +20,8 @@
 
 (def all-routes
   (make-routes [["/counter" counter-app/page]
-                ["/todo" todo-app/page]]))
+                ["/todo" todo-app/page]
+                ["/form" form-app/page]]))
 
 (def main-handler
   (ring/ring-handler
@@ -54,6 +57,9 @@
 
 (defn- text-content [selector]
   (.textContent (w/-query selector)))
+
+(defn- inner-text [selector]
+  (.innerText (w/-query selector)))
 
 (defn- input-value [selector]
   (.inputValue (w/-query (s/input selector))))
@@ -102,10 +108,10 @@
 
   ;; add new items
   (letfn [(add-todo [item]
-            (w/fill (s/input (s/attr "data-test" "=" "add-todo-input")) item)
-            (is (= item (input-value (s/attr "data-test" "=" "add-todo-input"))))
+            (w/fill (s/input (s/attr= "data-test" "add-todo-input")) item)
+            (is (= item (input-value (s/attr= "data-test" "add-todo-input"))))
             (w/keyboard-press "Enter")
-            (is (empty? (input-value (s/attr "data-test" "=" "add-todo-input"))))
+            (is (empty? (input-value (s/attr= "data-test" "add-todo-input"))))
             (w/in-viewport? (s/span (ws/text item))))]
     (add-todo "get milk")
     (add-todo "get cookies"))
@@ -115,3 +121,15 @@
                 (s/button (ws/text "Completed"))))
   (w/in-viewport? (s/> (s/li (s/first-of-type))
                        (s/button (ws/text "Still in progress")))))
+
+(deftest test-form-app
+  (w/navigate (app-url "form"))
+
+  (is (empty? (text-content (w/-query (s/div (s/attr= "id" "form-summary"))))))
+  
+  (w/fill (s/input (s/attr= "id" "some-input")) "Some text")
+  (w/click (s/input (s/attr= "id" "a-checkbox")))
+  (w/click (s/input (s/attr= "type" "submit")))
+
+  (is (= {:a-checkbox true :some-input "Some text"}
+         (edn/read-string (inner-text (s/p (s/attr= "id" "data-string")))))))
