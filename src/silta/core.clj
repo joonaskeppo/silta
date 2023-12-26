@@ -179,10 +179,17 @@
                                 coerce-params-middleware]
                    :handler (comp respond-html handler)}}])
 
+(defn make-script-tag
+  "Create <script> hiccup tag with optional `opts`."
+  ([] (make-script-tag nil))
+  ([opts]
+   (let [opts (merge (get-default-page-opts) opts)]
+     [:script (bundle-js opts)])))
+
 (defn- append-js
   "Adds script tag to hiccup page definition"
   [opts page]
-  (conj page [:script (bundle-js opts)]))
+  (conj page (make-script-tag opts)))
 
 (defn- get-default-sse-setting
   "Should SSE be set up by default?
@@ -220,7 +227,7 @@
                                               default-page-opts)
                                        renderer (constantly
                                                   (coerce-page
-                                                    (if (:append-client-js opts)
+                                                    (if (and (not (string? page)) (:append-client-js opts))
                                                       (append-js opts page)
                                                       page)))]
                                    [endpoint renderer]))))

@@ -4,13 +4,62 @@
             [clojure.walk :as walk]
             [silta.sources]
             [silta.impl.sources]
-            [silta.utils :refer [clj->json]]))
+            [silta.utils :refer [clj->json]])
+  (:import [clojure.lang IFn]))
 
 (defrecord
- ^{:doc "An atomic view component with optional (potentially side-effectful) `before` and `after` fns.
+  ^{:doc "An atomic view component with optional (potentially side-effectful) `before` and `after` fns.
     See `defview` for further documentation."}
- View
- [context endpoint props renderer])
+  View
+  [context endpoint props renderer]
+
+  IFn
+  (invoke [_]
+    (renderer {:params []}))
+  (invoke [_ arg1]
+    (renderer {:params [arg1]}))
+  (invoke [_ arg1 arg2]
+    (renderer {:params [arg1 arg2]}))
+  (invoke [_ arg1 arg2 arg3]
+    (renderer {:params [arg1 arg2 arg3]}))
+  (invoke [_ arg1 arg2 arg3 arg4]
+    (renderer {:params [arg1 arg2 arg3 arg4]}))
+  (invoke [_ arg1 arg2 arg3 arg4 arg5]
+    (renderer {:params [arg1 arg2 arg3 arg4 arg5]}))
+  (invoke [_ arg1 arg2 arg3 arg4 arg5 arg6]
+    (renderer {:params [arg1 arg2 arg3 arg4 arg5 arg6]}))
+  (invoke [_ arg1 arg2 arg3 arg4 arg5 arg6 arg7]
+    (renderer {:params [arg1 arg2 arg3 arg4 arg5 arg6 arg7]}))
+  (invoke [_ arg1 arg2 arg3 arg4 arg5 arg6 arg7 arg8]
+    (renderer {:params [arg1 arg2 arg3 arg4 arg5 arg6 arg7 arg8]}))
+  (invoke [_ arg1 arg2 arg3 arg4 arg5 arg6 arg7 arg8 arg9]
+    (renderer {:params [arg1 arg2 arg3 arg4 arg5 arg6 arg7 arg8 arg9]}))
+  (invoke [_ arg1 arg2 arg3 arg4 arg5 arg6 arg7 arg8 arg9 arg10]
+    (renderer {:params [arg1 arg2 arg3 arg4 arg5 arg6 arg7 arg8 arg9 arg10]}))
+  (invoke [_ arg1 arg2 arg3 arg4 arg5 arg6 arg7 arg8 arg9 arg10 arg11]
+    (renderer {:params [arg1 arg2 arg3 arg4 arg5 arg6 arg7 arg8 arg9 arg10 arg11]}))
+  (invoke [_ arg1 arg2 arg3 arg4 arg5 arg6 arg7 arg8 arg9 arg10 arg11 arg12]
+    (renderer {:params [arg1 arg2 arg3 arg4 arg5 arg6 arg7 arg8 arg9 arg10 arg11 arg12]}))
+  (invoke [_ arg1 arg2 arg3 arg4 arg5 arg6 arg7 arg8 arg9 arg10 arg11 arg12 arg13]
+    (renderer {:params [arg1 arg2 arg3 arg4 arg5 arg6 arg7 arg8 arg9 arg10 arg11 arg12 arg13]}))
+  (invoke [_ arg1 arg2 arg3 arg4 arg5 arg6 arg7 arg8 arg9 arg10 arg11 arg12 arg13 arg14]
+    (renderer {:params [arg1 arg2 arg3 arg4 arg5 arg6 arg7 arg8 arg9 arg10 arg11 arg12 arg13 arg14]}))
+  (invoke [_ arg1 arg2 arg3 arg4 arg5 arg6 arg7 arg8 arg9 arg10 arg11 arg12 arg13 arg14 arg15]
+    (renderer {:params [arg1 arg2 arg3 arg4 arg5 arg6 arg7 arg8 arg9 arg10 arg11 arg12 arg13 arg14 arg15]}))
+  (invoke [_ arg1 arg2 arg3 arg4 arg5 arg6 arg7 arg8 arg9 arg10 arg11 arg12 arg13 arg14 arg15 arg16]
+    (renderer {:params [arg1 arg2 arg3 arg4 arg5 arg6 arg7 arg8 arg9 arg10 arg11 arg12 arg13 arg14 arg15 arg16]}))
+  (invoke [_ arg1 arg2 arg3 arg4 arg5 arg6 arg7 arg8 arg9 arg10 arg11 arg12 arg13 arg14 arg15 arg16 arg17]
+    (renderer {:params [arg1 arg2 arg3 arg4 arg5 arg6 arg7 arg8 arg9 arg10 arg11 arg12 arg13 arg14 arg15 arg16 arg17]}))
+  (invoke [_ arg1 arg2 arg3 arg4 arg5 arg6 arg7 arg8 arg9 arg10 arg11 arg12 arg13 arg14 arg15 arg16 arg17 arg18]
+    (renderer {:params [arg1 arg2 arg3 arg4 arg5 arg6 arg7 arg8 arg9 arg10 arg11 arg12 arg13 arg14 arg15 arg16 arg17 arg18]}))
+  (invoke [_ arg1 arg2 arg3 arg4 arg5 arg6 arg7 arg8 arg9 arg10 arg11 arg12 arg13 arg14 arg15 arg16 arg17 arg18 arg19]
+    (renderer {:params [arg1 arg2 arg3 arg4 arg5 arg6 arg7 arg8 arg9 arg10 arg11 arg12 arg13 arg14 arg15 arg16 arg17 arg18 arg19]}))
+  (invoke [_ arg1 arg2 arg3 arg4 arg5 arg6 arg7 arg8 arg9 arg10 arg11 arg12 arg13 arg14 arg15 arg16 arg17 arg18 arg19 arg20]
+    (renderer {:params [arg1 arg2 arg3 arg4 arg5 arg6 arg7 arg8 arg9 arg10 arg11 arg12 arg13 arg14 arg15 arg16 arg17 arg18 arg19 arg20]}))
+  (invoke [_ arg1 arg2 arg3 arg4 arg5 arg6 arg7 arg8 arg9 arg10 arg11 arg12 arg13 arg14 arg15 arg16 arg17 arg18 arg19 arg20 res]
+    (apply renderer (into [arg1 arg2 arg3 arg4 arg5 arg6 arg7 arg8 arg9 arg10 arg11 arg12 arg13 arg14 arg15 arg16 arg17 arg18 arg19 arg20] res)))
+  (applyTo [_ args]
+    (apply renderer args)))
 
 (defn view? [x]
   (instance? View x))

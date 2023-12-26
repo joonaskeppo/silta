@@ -1,7 +1,8 @@
 (ns silta.test-apps.form
   "A simple form app.
   A demonstration of data groups."
-  (:require [silta.core :refer [defview]]))
+  (:require [silta.core :refer [defview]]
+            [silta.html :refer [html]]))
 
 ;; TODO: handle input updates on-blur, etc.
 ;; -> re-run validation logic for group (e.g., form elements)
@@ -34,6 +35,8 @@
              :value "Submit"}]]])
 
 (def page
-  [:div
-   [form]
-   [summary nil]])
+  (html
+    [:div
+     (form)
+     (summary nil)
+     (silta.core/make-script-tag)]))

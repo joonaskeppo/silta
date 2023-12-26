@@ -1,6 +1,7 @@
 (ns silta.test-apps.todo
   "A barebones todo app"
-  (:require [silta.core :refer [defview]]))
+  (:require [silta.core :refer [defview]]
+            [silta.html :refer [html]]))
 
 ;; use `def`-compliant notation: `todo:item`, `todo:list`
 ;; => `/todo/item`, `/todo/list`
@@ -48,12 +49,13 @@
       "Add"]]))
 
 (def page
-  (let [initial-todos [{:text "Make todo app" :checked true}
-                       {:text "Make it pretty" :checked false}]]
-    [:div
-     [:h1 "Todos"]
-     [add-todo]
-     [todo-list initial-todos]]))
+  (html
+    (let [initial-todos [{:text "Make todo app" :checked true}
+                         {:text "Make it pretty" :checked false}]]
+      [:div
+       [:h1 "Todos"]
+       (add-todo)
+       (todo-list initial-todos)])))
 
 (comment
   ((:renderer add-todo) {:params []})

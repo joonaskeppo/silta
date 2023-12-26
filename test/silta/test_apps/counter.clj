@@ -2,6 +2,7 @@
   "A super simple button clicker app"
   (:require [silta.core :refer [defview make-routes]]
             [silta.hiccup :as sh]
+            [silta.html :refer [html]]
             [silta.sources :as ss]
             [reitit.core :as r]
             [reitit.ring :as ring]
@@ -58,12 +59,12 @@
   (atom "hello"))
 
 (def page
-  (let [initial-counter 0]
-    [:div
-     [intro-text]
-     [test-sink +example-source+]
-     [notice {:counter initial-counter}]
-     [button initial-counter]]))
+  (html
+    (let [initial-counter 0]
+      [:div
+       (intro-text)
+       (test-sink +example-source+)
+       (notice {:counter initial-counter})
+       (button initial-counter)
+       (silta.core/make-script-tag)])))
 
-(comment
-  ((:renderer button) {:params [0]}))
